@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Framework</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main>
+        <h1>Game Framework</h1>
+        <p>A simple starter app for a Python game with backend, database, and UI.</p>
+
+        <section class="game-panel">
+            <div id="game-area" class="game-area" aria-label="Game area">
+                <div id="player-character" class="player-character">☺</div>
+            </div>
+            <p class="controls">Use WASD or the arrow keys to move the character.</p>
+        </section>
+
+        <form action="/submit" method="post">
+            <label for="player_name">Player Name</label>
+            <input id="player_name" name="player_name" required>
+
+            <label for="score">Score</label>
+            <input id="score" name="score" type="number" required>
+
+            <button type="submit">Save Score</button>
+        </form>
+
+        <section>
+            <h2>Top Scores</h2>
+            <ul>
+                {% for entry in scores %}
+                <li>{{ entry.player_name }} - {{ entry.score }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </main>
+
+    <script src="/static/game.js"></script>
+</body>
+</html>
