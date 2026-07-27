@@ -6,6 +6,13 @@ Importiert die `SpaceZooAPI` als einzige Schnittstelle zum Backend.
 
 import pygame
 import time
+import os
+import sys
+
+# Fügt das Projekt-Hauptverzeichnis zum Python-Pfad hinzu
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Ab hier folgen deine normalen Imports:
 from interface.spacezoo_api import SpaceZooAPI
 from frontend.map_renderer import MapRenderer
 from frontend.input_handler import InputHandler
