@@ -3,7 +3,6 @@ Frontend entrypoint for SpaceZoo.
 Initialisiert ein Pygame-Fenster (1260x960) und führt die Game-Loop aus.
 Importiert die `SpaceZooAPI` als einzige Schnittstelle zum Backend.
 """
-
 import pygame
 import time
 import os
