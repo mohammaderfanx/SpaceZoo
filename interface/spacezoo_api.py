@@ -13,8 +13,8 @@ import uuid
 
 # Backend / Database imports
 from database.db_manager import DatabaseManager
-from backend.simulation_engine import SimulationEngine
-from backend.animal import Animal
+from backend.simulation_engine_old import SimulationEngine
+from backend.animal_old import Animal
 from backend.staff import Caretaker, Vet, Cashier
 
 
