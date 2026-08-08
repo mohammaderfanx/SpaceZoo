@@ -27,19 +27,22 @@ classDiagram
         +int birthdate
         +Gender gender
         +float saturation
+        +float health
+        +float energy
         +Illness illness
         +Lifecycle lifecycle
         +Habits habits
+        +bool awake
         +getLifecyclePhase(int elapsedDays) LifecyclePhase
         +feed(float percentHungerQuelled) void
         +sleep() void
-        +age() void
-        +layEgg() void
+        +wake() void
+        +age(int elapsedDays) void
+        +layEgg(int elapsedDays) bool
     }
-    class Eagle
-    class Wolf
-    class Rabbit
-    Animal <|-- Rabbit
+    class Eagle 
+    class Wolf 
+    class Rabbit 
     class Zoo {
         +int budget
         +List~Animal~ animals
@@ -54,18 +57,18 @@ classDiagram
         +getVets() List~Vet~
         +getCashiers() List~Cashier~
         +animalDies(Animal animal) void
-        +buyNewAnimal() void
-        +sellAnimal() void
-        +hireEmployee() void
-        +buyFood() void
-        +buyMedicine() void
+        +buyNewAnimal(type~Animal~ animalType, String name, int birthdate, Gender gender) void
+        +sellAnimal(Animal animal) void
+        +hireEmployee(type~Employee~ employeeType, String name, WorkingHours workingHours) void
+        +buyFood(type~Food~ foodType, int weight, int elapsedDays) void
+        +buyMedicine(Medicine medicine, int quantity) void
         +healAnimal(Animal animal) void
     }
     class Employee {
-        +String id
         +String name
         +WorkingHours workingHours
         +int salary
+        +int busyFor
         +isOnShift(int elapsedHours) bool
     }
     class WorkingHours {
@@ -74,6 +77,7 @@ classDiagram
     }
     class Caretaker {
         +feedAnimal(Animal animal, float percentHungerQuelled) void
+        +cleanEnclosure(Enclosure enclosure) void
     }
     class Vet {
         +healAnimal(Animal animal) void
@@ -87,6 +91,7 @@ classDiagram
         +FoodPreference typeOfAnimal
         +List~Animal~ animals
         +float cleanliness
+        +getCleaned() void
     }
     class EnvironmentalFactors {
         +int temperature
@@ -118,6 +123,36 @@ classDiagram
         +object sleepingHabit
         +object eatingHabit
     }
+    class SimulationEngine {
+        +Zoo zoo
+        +EventScheduler eventScheduler
+        +int secondsPerTick
+        +int ticks
+        +int elapsedHours
+        +int elapsedDays
+        +bool running
+        +tick() void
+        +increaseTime() void
+        +decreaseSaturation() void
+        +decreaseHealth() void
+        +decreaseEnergy() void
+        +layEggs() void
+        +eggsHatch() void
+        +catchIllnesses() void
+        +decreaseCleanliness() void
+        +cleanEnclosures() void
+        +calculateVisitorScore() float
+        +start() void
+    }
+    class EventScheduler {
+        +Zoo zoo
+        +scheduleEvents(int elapsedDays, int elapsedHours) void
+        +feedAnimals(int elapsedHours) void
+        +animalsSleep(int elapsedHours) void
+        +ageUpAnimals(int elapsedDays) void
+        +visitorsArrive() void
+        +visitorsLeave() void
+    }
 
     Food <|-- Meat
     Food <|-- Hay
@@ -143,5 +178,8 @@ classDiagram
     Inventory "1" o-- "*" Medicine : stocks
     FoodItem "1" o-- "1" Food : references
     Egg "1" --> "1" Animal : species
+    SimulationEngine "1" --* "1" Zoo : owns
+    SimulationEngine "1" --* "1" EventScheduler : owns
+    EventScheduler "1" --> "1" Zoo : uses
 
 ```

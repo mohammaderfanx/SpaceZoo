@@ -5,7 +5,7 @@ version: 1
 """
 
 from animalSimulation.animal import Animal
-
+from enclosure import Enclosure
 
 class WorkingHours:
     """Start and end hour of an employee's daily shift."""
@@ -18,8 +18,7 @@ class WorkingHours:
 class Employee:
     """Base class for zoo staff, tracking identity, shift, and busy state."""
 
-    def __init__(self, id: str, name: str, workingHours: WorkingHours, salary: int = 10):
-        self.id = id
+    def __init__(self, name: str, workingHours: WorkingHours, salary: int = 10):
         self.name = name
         self.workingHours = workingHours
         self.salary = salary 
@@ -57,31 +56,49 @@ class Employee:
 class Caretaker(Employee):
     """Employee responsible for feeding and cleaning up after animals."""
 
-    def __init__(self, id: str, name: str, workingHours: WorkingHours):
-        super().__init__(id, name, workingHours, salary = 10)
+    def __init__(self, name: str, workingHours: WorkingHours):
+        super().__init__(name, workingHours, salary = 10)
 
     def feedAnimal(self, animal: Animal, percentHungerQuelled: float):
-        """Feeds the given animal by the specified hunger-quelled percentage.
+        """Feeds the given animal by the specified hunger-quelled percentage and is busy for one additional hour.
 
         Args:
             self
             animal: the animal to feed
             percentHungerQuelled: fraction of the animal's hunger that gets satisfied
+        
+        Returns:
+            None
 
         Tests:
-            called -> delegates to animal.feed(percentHungerQuelled)
-            called -> caretaker's busyFor is incremented
+            called if caretaker isn't busy -> delegates to animal.feed(percentHungerQuelled), caretaker becomes busy
+            called if caretaker busy -> becomes busy for an additional hour, animal is fed anyway
         """
         animal.feed(percentHungerQuelled)
         busyFor += 1
 
-
+    def cleanEnclosure(self, enclosure: Enclosure):
+        """Cleans enclosure and is busy for one additional hour.
+        
+            Args:
+                self
+                enclosure: Enclosure to clean
+            
+            Returns: 
+                None
+        
+            Tests:
+                called if caretaker isn't busy -> delegates to enclosure.getCleaned(), caretaker becomes busy
+                called if caretaker busy -> checked before, doesn't happen
+            """
+        enclosure.getCleaned()
+        self.busyFor += 1
 
 class Vet(Employee):
     """Employee responsible for healing sick animals."""
 
-    def __init__(self, id: str, name: str, workingHours: WorkingHours):
-        super().__init__(id, name, workingHours, salary = 10)
+    def __init__(self, name: str, workingHours: WorkingHours):
+        super().__init__(name, workingHours, salary = 10)
 
     def healAnimal(self, animal: Animal):
         """Heals the given animal, occupying the vet for one tick.
@@ -89,6 +106,9 @@ class Vet(Employee):
         Args:
             self
             animal: the animal being healed
+
+        Returns:
+            None
 
         Tests:
             called on a free vet -> busyFor increases by 1
@@ -101,8 +121,8 @@ class Vet(Employee):
 class Cashier(Employee):
     """Employee responsible for selling tickets to visitors."""
 
-    def __init__(self, id: str, name: str, workingHours: WorkingHours):
-        super().__init__(id, name, workingHours, salary = 10)
+    def __init__(self, name: str, workingHours: WorkingHours):
+        super().__init__(name, workingHours, salary = 10)
 
     def sellTicket(self):
         """Sells a ticket to a visitor.
@@ -114,5 +134,6 @@ class Cashier(Employee):
             visitor buys a ticket -> visitor count and budget increase
             no visitor present -> no-op
         """
+        self.busyFor += 1
 
 

@@ -23,3 +23,17 @@ class Enclosure:
         self.typeOfAnimal = foodPreference
         self.animals: List[Animal] = []
         self.cleanliness: float = 1
+
+    def getCleaned(self):
+        """Enclosure cleanliness to 100%
+        
+        Args:
+            self
+        
+        Returns:
+            None
+        
+        Tests:
+            enclosure is dirty -> cleanliness to 1
+            enclosure is already clean -> nothing changes"""
+        self.cleanliness = 1

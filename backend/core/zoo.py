@@ -6,11 +6,14 @@ version: 1
 
 
 from typing import List
+import statistics
 
-from animalSimulation.animal import Animal
-from zooManagement.employee import Employee, Caretaker, Vet, Cashier
+from animalSimulation.animal import Animal, Gender
+from zooManagement.employee import Employee, Caretaker, Vet, Cashier, WorkingHours
 from zooManagement.inventory import Inventory
 from zooManagement.enclosure import Enclosure
+from zooManagement.food import Food, FoodItem
+from zooManagement.medicine import Medicine
 from animalSimulation.egg import Egg
 from animalSimulation.environmentalFactors import EnvironmentalFactors
 
@@ -103,60 +106,99 @@ class Zoo:
         self.animals.remove(animal)
 
 
-    def buyNewAnimal(self):
-        """Lets the player choose and buy a new animal from the known types.
+    def buyNewAnimal(self, animalType: type[Animal], name: str, birthdate: int, gender: Gender):
+        """Buys an animal with given species, gender and name.
 
         Args:
             self
+            animalType: the Animal subclass to buy, carrying its purchase price as a class attribute
+            name: name for the new animal
+            birthdate: day that the animal was born, determines age
+            gender: gender of the new animal
 
         Tests:
             budget covers the chosen animal -> animal is added to the zoo
             budget insufficient -> purchase is rejected
         """
+        newAnimal = animalType(name, birthdate, gender)
+        if self.budget < newAnimal.price:
+            return
+        self.budget -= newAnimal.price
+        self.animals.append(newAnimal)
 
-    def sellAnimal(self):
+    def sellAnimal(self, animal: Animal):
           """Sells a chosen animal.
 
           Args:
               self
+              animal: the animal to sell
 
           Tests:
               chosen animal exists in the zoo -> animal is removed and budget increases
               no animal selected -> no-op
           """
+          if animal not in self.animals:
+              return
+          self.budget += animal.price // 2
+          self.animals.remove(animal)
 
-    def hireEmployee(self):
+    def hireEmployee(self, employeeType: type[Employee], name: str, workingHours: WorkingHours):
          """Hires a new employee.
 
          Args:
              self
+             employeeType: the Employee subclass to hire
+             name: name of the new employee
+             workingHours: the new employee's shift hours
 
          Tests:
              valid employee data provided -> employee is added to staff
              invalid employee data -> hire is rejected
          """
+         if not name:
+             return
+         if not (0 <= workingHours.startOfShift <= 23) or not (0 <= workingHours.endOfShift <= 23):
+             return
+         self.staff.append(employeeType(name, workingHours))
 
-    def buyFood(self):
+    def buyFood(self, foodType: type[Food], weight: int, elapsedDays: int):
           """Buys chosen food items and adds them to the inventory.
 
           Args:
               self
+              foodType: the Food subclass to buy
+              weight: kilograms to buy
+              elapsedDays: number of full days elapsed in the simulation, used to compute the food's expiry
 
           Tests:
               budget covers the chosen food -> items are added to inventory
               budget insufficient -> purchase is rejected
           """
+          foodInstance = foodType()
+          totalPrice = foodInstance.pricePerKg * weight
+          if self.budget < totalPrice:
+              return
+          self.budget -= totalPrice
+          self.inventory.food.append(FoodItem(foodInstance, weight, elapsedDays))
 
-    def buyMedicine(self):
+    def buyMedicine(self, medicine: Medicine, quantity: int):
           """Buys chosen medicine items and adds them to the inventory.
 
           Args:
               self
+              medicine: the medicine to buy
+              quantity: number of units to buy
 
           Tests:
               budget covers the chosen medicine -> items are added to inventory
               budget insufficient -> purchase is rejected
           """
+          totalPrice = medicine.price * quantity
+          if self.budget < totalPrice:
+              return
+          self.budget -= totalPrice
+          for _ in range(quantity):
+              self.inventory.medicine.append(medicine)
 
     def healAnimal(self, animal: Animal):
         """Heals the given animal using an available vet if matching medicine is in stock.

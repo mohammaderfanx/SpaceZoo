@@ -5,9 +5,12 @@ version: 1
 """
 
 
+import random
 import threading
 from core.eventScheduler import EventScheduler
 from core.zoo import Zoo
+from animalSimulation.egg import Egg
+from animalSimulation.animal import Gender
 import statistics
 
 class SimulationEngine:
@@ -74,6 +77,11 @@ class SimulationEngine:
             animal not fed this tick -> saturation decreases
             animal already at minimum saturation -> animal dies
         """
+        for animal in list(self.zoo.animals):
+            if animal.saturation <= 0:
+                self.zoo.animalDies(animal)
+            else:
+                animal.saturation = max(0, animal.saturation - 0.1)
 
     def decreaseHealth(self):
         """Reduces health for sick animals, possibly killing them.
@@ -89,6 +97,11 @@ class SimulationEngine:
             animal is sick -> health decreases
             animal's health reaches 0 -> animal dies
         """
+        for animal in list(self.zoo.animals):
+            if animal.illness is not None:
+                animal.health = max(0, animal.health - animal.illness.lethality * 0.1)
+            if animal.health <= 0:
+                self.zoo.animalDies(animal)
 
     def decreaseEnergy(self):
         """Reduces energy for animals that aren't sleeping.
@@ -104,9 +117,12 @@ class SimulationEngine:
             animal is awake -> energy decreases
             animal is asleep -> energy stays the same
         """
+        for animal in self.zoo.animals:
+            if animal.awake:
+                animal.energy = max(0, animal.energy - 0.05)
 
     def layEggs(self):
-        """Lets eligible animals lay eggs, by chance, in a suitable spot.
+        """Lets one eligible animals per enclosure with space lay an egg by chance.
 
         Args:
             self
@@ -118,6 +134,12 @@ class SimulationEngine:
             eligible animal and a free spot -> egg may be created
             no eligible animals -> no eggs are created
         """
+        possibleEnclosures = [enclosure for enclosure in self.zoo.enclosures if len(enclosure.animals) < enclosure.capacity]
+        for enclosure in possibleEnclosures:
+            possibleAnimals = [animal for animal in enclosure.animals if animal.gender.name == 'FEMALE']
+            if len(possibleAnimals) > 0:
+                if possibleAnimals[0].layEgg(self.elapsedDays):
+                    self.zoo.eggs.append(Egg(type(possibleAnimals[0]), self.elapsedDays))
 
     def eggsHatch(self):
         """Hatches eggs that are due, creating new animals.
@@ -132,6 +154,13 @@ class SimulationEngine:
             egg's dayOfHatching has passed -> new animal is created and egg removed
             egg not yet due -> egg remains unchanged
         """
+        hatchedEggs = [egg for egg in self.zoo.eggs if egg.dayOfHatching <= self.elapsedDays]
+        for egg in hatchedEggs:
+            gender = random.choice(list(Gender))
+            newId = f"{egg.species.__name__}-{self.elapsedDays}-{len(self.zoo.animals)}"
+            newAnimal = egg.species(newId, egg.species.__name__, self.elapsedDays, gender)
+            self.zoo.animals.append(newAnimal)
+            self.zoo.eggs.remove(egg)
 
     def catchIllnesses(self):
         """Randomly assigns illnesses to animals, more likely where a sick animal already shares the enclosure.
@@ -148,8 +177,8 @@ class SimulationEngine:
         """
 
 
-    def cleanEnclosures(self):
-        """Cleans enclosures where a caretaker is available.
+    def decreaseCleanliness(self):
+        """Reduces enclosure cleanliness over time as animals dirty them.
 
         Args:
             self
@@ -158,9 +187,43 @@ class SimulationEngine:
             None
 
         Tests:
-            caretaker available -> enclosure cleanliness increases
-            no caretaker available -> enclosure stays dirty
+            enclosure cleanliness above 0 -> cleanliness decreases by 10%
+            enclosure already at minimum cleanliness -> stays at 0
         """
+        for enclosure in self.zoo.enclosures:
+            enclosure.cleanliness = max(0, enclosure.cleanliness - 0.1)
+
+    def cleanEnclosures(self):
+        """Cleans enclosures below 50% cleanliness, dividing them among available caretakers.
+
+        Args:
+            self
+
+        Return:
+            None
+
+        Tests:
+            caretaker available and enclosure below 50% cleanliness -> caretaker cleans it
+            no caretaker available -> enclosure stays dirty
+            enclosure at or above 50% cleanliness -> not cleaned
+        """
+        enclosuresToClean = [enclosure for enclosure in self.zoo.enclosures if enclosure.cleanliness < 0.5]
+
+        if len(enclosuresToClean) == 0:
+            return 
+        
+        availableCaretakers = self.zoo.getCaretakers()
+        if len(availableCaretakers) == 0:
+            return 
+        
+        for indexEnclosure in range(len(enclosuresToClean)):
+            currentEnclosure = enclosuresToClean[indexEnclosure]
+            currentCaretaker = availableCaretakers[indexEnclosure % len(availableCaretakers)]
+            currentCaretaker.cleanEnclosure(currentEnclosure)
+        availableCaretakers = self.zoo.getCaretakers()
+        
+        
+
 
     def calculateVisitorScore(self):
         """Computes the visitor score from environment, animal count, and enclosure cleanliness.

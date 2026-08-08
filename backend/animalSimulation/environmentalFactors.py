@@ -35,7 +35,6 @@ class EnvironmentalFactors:
             sunny, calm, optimal temperature -> highest combined score
             rainy, windy, extreme temperature -> lowest combined score
         """
-        #switch case
         weatherCoefficient = self.__getWeatherCoefficient()
         windSpeedCoefficient = self.__getWindSpeedCoefficient()
         temperatureCoefficient = self.__getTemperatureCoefficient()

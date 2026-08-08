@@ -159,6 +159,16 @@ class EventScheduler:
             cashiers available -> visitors are let in and tickets get sold
             no cashiers available -> visitors cannot buy tickets
         """
+        availableCashiers = self.zoo.getCashiers()
+        if len(availableCashiers) == 0:
+            return
+        ticketPrice = 5
+        newVisitors = self.zoo.score
+        for index in range(newVisitors):
+            cashier = availableCashiers[index % len(availableCashiers)]
+            cashier.sellTicket()
+            self.zoo.visitors += 1
+            self.zoo.budget += ticketPrice
 
     def visitorsLeave(self):
         """Sends visitors home.
@@ -170,4 +180,5 @@ class EventScheduler:
             visitors present -> visitor count drops to 0
             no visitors present -> no-op
         """
-    #,,,,,äääh nein mein kind ich hab dir diesen roten apfel mitgebracht weil dun soo lieeeeb bist <3
+        self.zoo.visitors = 0
+   
