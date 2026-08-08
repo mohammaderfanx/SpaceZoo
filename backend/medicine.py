@@ -1,4 +1,4 @@
-from backend.animal_old import AnimalType
+
 from datetime import date, timedelta
 from illness import Illness
 from typing import List
@@ -11,6 +11,9 @@ class Medicine:
         self.price = price
         self.illness = illness
 
+class ExampleMedicine:
+    def __init__(self):
+        super().__init__("Medicine against ExampleIllness", 30, 12, ExampleMedicine)
 
 
 class MedicineItem:

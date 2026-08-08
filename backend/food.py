@@ -1,25 +1,25 @@
-from backend.animal_old import AnimalType
+from habits import FoodPreference
 from typing import List
 
 class Food:
-    def __init__(self, name: str, animalTypes: List[AnimalType], shelfLife: int, pricePerKg: int):
+    def __init__(self, name: str, foodPreference: List[FoodPreference], shelfLife: int, pricePerKg: int):
         self.name = name
-        self.animalTypes = animalTypes
+        self.foodPreference = foodPreference
         self.shelfLife = shelfLife
         self.pricePerKg = pricePerKg
 
 
 class Meat(Food):
     def __init__(self):
-        super().__init__("Meat", [AnimalType.CARNIVORE], 10, 3)
+        super().__init__("Meat", [FoodPreference.CARNIVORE, FoodPreference.OMNIVORE], 10, 3)
 
 class Hay(Food):
     def __init__(self):
-        super().__init__("Hay", [AnimalType.HERBIVORE], 25, 1)
+        super().__init__("Hay", [FoodPreference.HERBIVORE, FoodPreference.OMNIVORE], 25, 1)
 
 class Fish(Food):
     def __init__(self):
-        super().__init__("Fish", [AnimalType.CARNIVORE], 7, 5)
+        super().__init__("Fish", [FoodPreference.CARNIVORE, FoodPreference.OMNIVORE], 7, 5)
 
 
 

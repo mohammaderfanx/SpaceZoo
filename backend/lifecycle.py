@@ -1,7 +1,7 @@
 class LifecyclePhase:
-    def __init__(self, endOfPhaseAge: int, requiredFoodPerDay: int, riskOfIllnessMultiplier: float):
+    def __init__(self, endOfPhaseAge: int, requiredFoodPerFeeding: int, riskOfIllnessMultiplier: float):
         self.endOfPhaseAge = endOfPhaseAge
-        self.requiredFoodPerDay = requiredFoodPerDay
+        self.requiredFoodPerFeeding = requiredFoodPerFeeding
         self.riskOfIllnessMultiplier = riskOfIllnessMultiplier
 
 
