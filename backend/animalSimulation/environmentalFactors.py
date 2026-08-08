@@ -23,7 +23,18 @@ class EnvironmentalFactors:
         self.weather = weather
 
     def getVisitorAttractiveness(self) -> float:
-        """Computes overall visitor attractiveness from weather, wind, and temperature."""
+        """Computes overall visitor attractiveness from weather, wind, and temperature.
+
+        Args:
+            self
+
+        Returns:
+            float: combined attractiveness score used to compute the visitor count
+
+        Tests:
+            sunny, calm, optimal temperature -> highest combined score
+            rainy, windy, extreme temperature -> lowest combined score
+        """
         #switch case
         weatherCoefficient = self.__getWeatherCoefficient()
         windSpeedCoefficient = self.__getWindSpeedCoefficient()
@@ -31,7 +42,19 @@ class EnvironmentalFactors:
         return weatherCoefficient * windSpeedCoefficient * temperatureCoefficient
 
     def __getWeatherCoefficient(self) -> float:
-        """Returns the attractiveness coefficient for the current weather."""
+        """Returns the attractiveness coefficient for the current weather.
+
+        Args:
+            self
+
+        Returns:
+            float: coefficient for the current Weather value
+
+        Tests:
+            weather is SUNNY -> returns 1.5
+            weather is CLOUDY -> returns 1
+            weather is RAINY -> returns 0.5
+        """
         weatherCoefficient: float
         if self.weather == Weather.SUNNY:
             weatherCoefficient = 1.5
@@ -43,7 +66,18 @@ class EnvironmentalFactors:
 
 
     def __getWindSpeedCoefficient(self) -> float:
-        """Returns the attractiveness coefficient for the current wind speed."""
+        """Returns the attractiveness coefficient for the current wind speed.
+
+        Args:
+            self
+
+        Returns:
+            float: coefficient for the current wind speed
+
+        Tests:
+            windSpeed below 50 -> returns 1
+            windSpeed at or above 50 -> returns 0.3
+        """
         if self.windSpeed < 50:
             return 1
         return 0.3 # toooo windy for noobs
