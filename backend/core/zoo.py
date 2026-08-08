@@ -1,11 +1,11 @@
 from typing import List
 
-from backend.animalSimulation.animal import Animal
-from backend.zooManagement.employee import Employee, Caretaker, Vet, Cashier
-from backend.zooManagement.inventory import Inventory
-from backend.zooManagement.enclosure import Enclosure
-from backend.animalSimulation.egg import Egg
-from backend.animalSimulation.environmentalFactors import EnvironmentalFactors
+from animalSimulation.animal import Animal
+from zooManagement.employee import Employee, Caretaker, Vet, Cashier
+from zooManagement.inventory import Inventory
+from zooManagement.enclosure import Enclosure
+from animalSimulation.egg import Egg
+from animalSimulation.environmentalFactors import EnvironmentalFactors
 
 class Zoo:
     """Central aggregate holding the zoo's animals, staff, enclosures, inventory, and budget, as well as environmental factors and the current visitor score."""
@@ -16,7 +16,7 @@ class Zoo:
         self.staff: List[Employee] = []
         self.enclosures: List[Enclosure] = []
         self.visitors: int = 0
-        self.inventory: Inventory
+        self.inventory: Inventory = Inventory()
         self.eggs: List[Egg] = []
         self.environment: EnvironmentalFactors = EnvironmentalFactors()
         self.score: float = 0

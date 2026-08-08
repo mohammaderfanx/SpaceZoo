@@ -1,6 +1,6 @@
 
 from datetime import date, timedelta
-from backend.animalSimulation.illness import Illness
+from animalSimulation.illness import Illness
 from typing import List
 
 

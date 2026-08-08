@@ -1,7 +1,7 @@
 from enum import Enum
-from backend.animalSimulation.illness import Illness
-from backend.animalSimulation.lifecycle import Lifecycle, LifecyclePhase
-from backend.animalSimulation.habits import Habits, SleepingHabit, EatingHabit, FoodPreference
+from animalSimulation.illness import Illness
+from animalSimulation.lifecycle import Lifecycle, LifecyclePhase
+from animalSimulation.habits import Habits, SleepingHabit, EatingHabit, FoodPreference
 
 class Gender(Enum):
     """Biological sex of an animal."""

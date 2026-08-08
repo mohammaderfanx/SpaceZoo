@@ -1,4 +1,4 @@
-from backend.animalSimulation.animal import Animal
+from animalSimulation.animal import Animal
 
 class Egg:
     """An unhatched animal of a given species, due to hatch after a fixed number of days."""

@@ -1,4 +1,4 @@
-from backend.animalSimulation.habits import FoodPreference
+from animalSimulation.habits import FoodPreference
 from typing import List
 
 class Food:

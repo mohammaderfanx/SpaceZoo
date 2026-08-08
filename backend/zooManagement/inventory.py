@@ -1,7 +1,7 @@
 from typing import List
-from backend.zooManagement.food import FoodItem, Food
-from backend.zooManagement.medicine import Medicine
-from backend.animalSimulation.illness import Illness
+from zooManagement.food import FoodItem, Food
+from zooManagement.medicine import Medicine
+from animalSimulation.illness import Illness
 
 class Inventory:
     """Tracks the zoo's stock of food and medicine."""

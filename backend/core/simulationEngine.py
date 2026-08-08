@@ -1,6 +1,6 @@
 import threading
-from eventScheduler import EventScheduler
-from zoo import Zoo
+from core.eventScheduler import EventScheduler
+from core.zoo import Zoo
 import statistics
 
 class SimulationEngine:
@@ -25,8 +25,8 @@ class SimulationEngine:
         Tests:
             called once -> elapsed time advances and all periodic effects apply, with the next tick scheduled via threading.Timer
         """
+        print(self.elapsedHours)
         self.increaseTime()
-        # stop being busy?
         self.eventScheduler.scheduleEvents(self.elapsedDays, self.elapsedHours)
         self.decreaseSaturation()
         self.decreaseHealth()
@@ -55,25 +55,45 @@ class SimulationEngine:
             self.elapsedDays += 1
 
 
-    def decreaseSaturation():
+    def decreaseSaturation(self):
         """Reduces saturation for unfed animals, possibly killing them.
+
+        Args:
+            self
+
+        Return:
+            None
 
         Tests:
             animal not fed this tick -> saturation decreases
             animal already at minimum saturation -> animal dies
         """
 
-    def decreaseHealth():
+    def decreaseHealth(self):
         """Reduces health for sick animals, possibly killing them.
 
+        Args:
+            self
+
+        Return:
+            None
+        
+                    
         Tests:
             animal is sick -> health decreases
             animal's health reaches 0 -> animal dies
         """
 
-    def decreaseEnergy():
+    def decreaseEnergy(self):
         """Reduces energy for animals that aren't sleeping.
 
+        Args:
+            self
+
+        Return:
+            None
+
+                    
         Tests:
             animal is awake -> energy decreases
             animal is asleep -> energy stays the same
@@ -84,6 +104,9 @@ class SimulationEngine:
 
         Args:
             self
+
+        Return:
+            None
 
         Tests:
             eligible animal and a free spot -> egg may be created
@@ -96,6 +119,9 @@ class SimulationEngine:
         Args:
             self
 
+        Return:
+            None
+
         Tests:
             egg's dayOfHatching has passed -> new animal is created and egg removed
             egg not yet due -> egg remains unchanged
@@ -106,6 +132,9 @@ class SimulationEngine:
 
         Args:
             self
+
+        Return:
+            None
 
         Tests:
             enclosure has a sick animal -> higher chance of new illnesses there
@@ -119,6 +148,9 @@ class SimulationEngine:
         Args:
             self
 
+        Return:
+            None
+
         Tests:
             caretaker available -> enclosure cleanliness increases
             no caretaker available -> enclosure stays dirty
@@ -129,6 +161,9 @@ class SimulationEngine:
 
         Args:
             self
+
+        Return:
+            None
 
         Returns:
             float: combined score used to attract visitors
@@ -150,6 +185,9 @@ class SimulationEngine:
 
         Args:
             self
+
+        Return:
+            None
 
         Tests:
             called once -> tick() begins the recurring simulation loop

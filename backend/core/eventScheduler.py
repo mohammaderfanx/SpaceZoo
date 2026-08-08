@@ -1,7 +1,7 @@
-from zoo import Zoo
-from backend.zooManagement.employee import Caretaker, WorkingHours, Employee
-from backend.animalSimulation.animal import Animal
-from backend.zooManagement.food import FoodItem
+from core.zoo import Zoo
+from zooManagement.employee import Caretaker, WorkingHours, Employee
+from animalSimulation.animal import Animal
+from zooManagement.food import FoodItem
 from typing import List
 
 class EventScheduler:

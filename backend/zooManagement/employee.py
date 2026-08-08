@@ -1,5 +1,5 @@
 
-from backend.animalSimulation.animal import Animal
+from animalSimulation.animal import Animal
 
 
 class WorkingHours:
