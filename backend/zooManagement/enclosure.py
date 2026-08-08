@@ -1,5 +1,5 @@
-from habits import FoodPreference
-from animal import Animal
+from backend.animalSimulation.habits import FoodPreference
+from backend.animalSimulation.animal import Animal
 from itertools import count
 from typing import List
 
@@ -7,6 +7,8 @@ from typing import List
 
 
 class Enclosure:
+    """A numbered habitat that houses animals of a given diet type up to a capacity."""
+
     _number_counter = count(1)
 
     def __init__(self, capacity, foodPreference: FoodPreference):

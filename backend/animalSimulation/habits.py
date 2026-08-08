@@ -3,6 +3,7 @@ from typing import List
 
 
 class SleepingHabit:
+    """The hours at which an animal wakes and falls asleep."""
 
     def __init__(self, hourOfWaking: int, hourOfFallingAsleep: int):
         self.hourOfWaking = hourOfWaking
@@ -10,11 +11,14 @@ class SleepingHabit:
 
 
 class FoodPreference(Enum):
+    """Dietary category of an animal."""
+
     CARNIVORE = "carnivore"
     HERBIVORE = "herbivore"
     OMNIVORE = "omnivore"
 
 class EatingHabit:
+    """An animal's diet type and the hours at which it needs feeding."""
 
     def __init__(self, foodPreference: FoodPreference, feedingTimes: List[int]):
         self.foodPreference = foodPreference
@@ -25,6 +29,7 @@ class EatingHabit:
 
 
 class Habits:
+    """Bundles an animal's sleeping and eating habits."""
 
     def __init__(self, sleepingHabit: SleepingHabit, eatingHabit: EatingHabit):
         self.sleepingHabit = sleepingHabit

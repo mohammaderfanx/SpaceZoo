@@ -1,15 +1,17 @@
 from zoo import Zoo
-from employee import Caretaker, WorkingHours, Employee
-from animal import Animal
-from food import FoodItem
+from backend.zooManagement.employee import Caretaker, WorkingHours, Employee
+from backend.animalSimulation.animal import Animal
+from backend.zooManagement.food import FoodItem
 from typing import List
 
 class EventScheduler:
+    """Triggers time-based zoo events such as feeding, aging, and visitor arrivals/departures."""
 
     def __init__(self, zoo: Zoo):
         self.zoo = zoo
 
     def scheduleEvents(self, elapsedDays: int, elapsedHours: int):
+        """Dispatches time-based events for the current hour."""
         if elapsedHours == 0:
             self.ageUpAnimals(elapsedDays)
         if elapsedHours == 8:
@@ -21,6 +23,7 @@ class EventScheduler:
 
 
     def feedAnimals(self, elapsedHours: int):
+        """Feeds all animals due for feeding using available caretakers."""
 
         animalsToFeed: List[Animal] = []
         for animal in self.zoo.animals:
@@ -39,18 +42,15 @@ class EventScheduler:
             currentAnimal = animalsToFeed[indexAnimal]
             # check if enough food
             currentCaretaker = availableCaretakers[indexAnimal % len(availableCaretakers)]
-            currentCaretaker.feedAnimal(currentAnimal, self.determineHungerQuelled(currentAnimal))
+            currentCaretaker.feedAnimal(currentAnimal, self.__determineHungerQuelled(currentAnimal))
          
         
-    def determineHungerQuelled(self, currentAnimal: Animal):
+    def __determineHungerQuelled(self, currentAnimal: Animal):
+            """Calculates the percentage of the animal's hunger satisfied by available food."""
             foodPreference = currentAnimal.habits.eatingHabit.foodPreference.name
             requiredFood = currentAnimal.getLifecyclePhase().requiredFoodPerFeeding
             additionalFoodNeeded = requiredFood
-            possibleFoodForAnimal: List[FoodItem] = []
-            for foodItem in self.zoo.inventory.food:
-                if foodItem.type.foodPreference.__contains__(foodPreference):
-                    possibleFoodForAnimal.append(foodItem)
-            possibleFoodForAnimal.sort(foodItem.bestBefore) # ka ob so richtig
+            possibleFoodForAnimal = self.zoo.inventory.listOfFoodInCategory(type[foodPreference])
             assignedFood = 0
             while additionalFoodNeeded > assignedFood and len(possibleFoodForAnimal) != 0:
                 currentFoodItem = possibleFoodForAnimal.pop(0)
@@ -65,6 +65,7 @@ class EventScheduler:
 
     
     def ageUpAnimals(self, elapsedDays: int):
+        """Advances animals to their next lifecycle phase when due."""
         for animal in self.zoo.animals:
             age = elapsedDays - animal.birthdate
             if age == animal.getLifecyclePhase().endOfPhaseAge:
@@ -72,8 +73,8 @@ class EventScheduler:
 
 
     def visitorsArrive(self):
-        """Kommen halt so ein paar Visitors, Cashiers machen ihr Ding"""
+        """Lets visitors into the zoo for cashiers to sell tickets to."""
 
     def visitorsLeave(self):
-        """gehen wieder"""
+        """Sends visitors home."""
     #,,,,,äääh nein mein kind ich hab dir diesen roten apfel mitgebracht weil dun soo lieeeeb bist <3
