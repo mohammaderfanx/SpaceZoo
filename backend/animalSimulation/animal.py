@@ -1,3 +1,9 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
 from enum import Enum
 from animalSimulation.illness import Illness
 from animalSimulation.lifecycle import Lifecycle, LifecyclePhase

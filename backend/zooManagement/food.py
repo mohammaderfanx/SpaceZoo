@@ -1,3 +1,9 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
 from animalSimulation.habits import FoodPreference
 from typing import List
 

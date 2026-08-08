@@ -1,3 +1,10 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
+
 import threading
 from core.eventScheduler import EventScheduler
 from core.zoo import Zoo
@@ -25,7 +32,6 @@ class SimulationEngine:
         Tests:
             called once -> elapsed time advances and all periodic effects apply, with the next tick scheduled via threading.Timer
         """
-        print(self.elapsedHours)
         self.increaseTime()
         self.eventScheduler.scheduleEvents(self.elapsedDays, self.elapsedHours)
         self.decreaseSaturation()

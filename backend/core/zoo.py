@@ -1,3 +1,10 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
+
 from typing import List
 
 from animalSimulation.animal import Animal

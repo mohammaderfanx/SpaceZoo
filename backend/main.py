@@ -1,7 +1,12 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
 from core.simulationEngine import SimulationEngine
 
 def main():
-    print("hiii")
     simulationEngine = SimulationEngine()
     simulationEngine.start()
 

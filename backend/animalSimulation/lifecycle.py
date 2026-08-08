@@ -1,3 +1,9 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
 class LifecyclePhase:
     """A single life stage of an animal, defining its age limit, food needs, and illness risk."""
 

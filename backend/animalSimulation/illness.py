@@ -1,3 +1,9 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
 class Illness:
     """An illness type with its lethality and likelihood of occurring."""
 

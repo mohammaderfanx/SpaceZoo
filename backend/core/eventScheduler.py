@@ -1,3 +1,9 @@
+"""
+author: Jasmin Romeyke
+date: 08.08.2026
+version: 1
+"""
+
 from core.zoo import Zoo
 from zooManagement.employee import Caretaker, WorkingHours, Employee
 from animalSimulation.animal import Animal
