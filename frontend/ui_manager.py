@@ -5,16 +5,23 @@ All data is fetched from `SpaceZooAPI`.
 """
 
 import pygame
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from interface.spacezoo_api import SpaceZooAPI
 
 
 class UIButton:
-    """Represents a clickable dashboard button with an action callback."""
+    """Represents a clickable dashboard button with an action callback.
 
-    def __init__(self, label: str, action: Callable[[], Dict[str, Any]]):
+    `group_key` marks a button as a group toggle (e.g. "Buy Animal"): clicking it
+    expands/collapses the matching entry in `UIManager.group_children` instead of
+    performing a zoo action directly.
+    """
+
+    def __init__(self, label: str, action: Callable[[], Dict[str, Any]], group_key: Optional[str] = None):
         self.label = label
+        self.base_label = label
         self.action = action
+        self.group_key = group_key
         self.rect = pygame.Rect(0, 0, 0, 0)
 
 
@@ -42,6 +49,9 @@ class UIManager:
         self.shift_options = [(6, 14), (8, 16), (8, 18), (14, 22), (22, 6)]
         self.current_shift_index = 2
         self.shift_button: UIButton | None = None
+        self.group_children: Dict[str, List[UIButton]] = {}
+        self.expanded_group: Optional[str] = None
+        self._visible_buttons: List[UIButton] = []
         self._scale = 1.0
         self._offset = (0, 0)
         self._build_buttons()
@@ -66,25 +76,55 @@ class UIManager:
 
     def _build_buttons(self) -> None:
         self.shift_button = UIButton(self._shift_label(), self._action_cycle_shift)
+
+        self.group_children = {
+            "animal": [
+                UIButton("Eagle", self._group_action(lambda: self._action_buy_animal("Eagle"))),
+                UIButton("Wolf", self._group_action(lambda: self._action_buy_animal("Wolf"))),
+                UIButton("Rabbit", self._group_action(lambda: self._action_buy_animal("Rabbit"))),
+            ],
+            "food": [
+                UIButton("Meat", self._group_action(lambda: self._action_buy_food("Meat"))),
+                UIButton("Hay", self._group_action(lambda: self._action_buy_food("Hay"))),
+                UIButton("Fish", self._group_action(lambda: self._action_buy_food("Fish"))),
+            ],
+            "staff": [
+                UIButton("Caretaker", self._group_action(lambda: self._action_hire_staff("Caretaker"))),
+                UIButton("Vet", self._group_action(lambda: self._action_hire_staff("Vet"))),
+                UIButton("Cashier", self._group_action(lambda: self._action_hire_staff("Cashier"))),
+            ],
+        }
+
         self.buttons = [
             UIButton("Advance Tick", self._action_advance_tick),
-            UIButton("Buy Eagle", lambda: self._action_buy_animal("Eagle")),
-            UIButton("Buy Wolf", lambda: self._action_buy_animal("Wolf")),
-            UIButton("Buy Rabbit", lambda: self._action_buy_animal("Rabbit")),
+            UIButton("Buy Animal", lambda: self._action_toggle_group("animal"), group_key="animal"),
             UIButton("Sell Animal", self._action_sell_animal),
-            UIButton("Buy Meat", lambda: self._action_buy_food("Meat")),
-            UIButton("Buy Hay", lambda: self._action_buy_food("Hay")),
-            UIButton("Buy Fish", lambda: self._action_buy_food("Fish")),
+            UIButton("Buy Food", lambda: self._action_toggle_group("food"), group_key="food"),
             UIButton("Buy Medicine", self._action_buy_medicine),
             self.shift_button,
-            UIButton("Hire Caretaker", lambda: self._action_hire_staff("Caretaker")),
-            UIButton("Hire Vet", lambda: self._action_hire_staff("Vet")),
+            UIButton("Hire Staff", lambda: self._action_toggle_group("staff"), group_key="staff"),
             UIButton("Fire Staff", self._action_fire_staff),
             UIButton("Feed Animal", self._action_feed_animal),
             UIButton("Heal Animal", self._action_heal_animal),
             UIButton("Clean Enclosure", self._action_clean_enclosure),
             UIButton("Toggle Weather", self._action_toggle_weather),
         ]
+        self._visible_buttons = list(self.buttons)
+
+    def _group_action(self, action: Callable[[], Dict[str, Any]]) -> Callable[[], Dict[str, Any]]:
+        """Wraps a sub-menu action so picking it also collapses the menu back."""
+        def wrapped() -> Dict[str, Any]:
+            result = action()
+            self.expanded_group = None
+            return result
+        return wrapped
+
+    def _action_toggle_group(self, group_key: str) -> Dict[str, Any]:
+        if self.expanded_group == group_key:
+            self.expanded_group = None
+            return {"success": True, "message": "Menu closed."}
+        self.expanded_group = group_key
+        return {"success": True, "message": "Choose an option below."}
 
     def _shift_label(self) -> str:
         start, end = self.shift_options[self.current_shift_index]
@@ -149,7 +189,7 @@ class UIManager:
                 (event.pos[0] - self._offset[0]) / self._scale,
                 (event.pos[1] - self._offset[1]) / self._scale,
             )
-            for button in self.buttons:
+            for button in self._visible_buttons:
                 if button.rect.collidepoint(native_pos):
                     result = button.action()
                     self.message = result.get("message", "Action executed.")
@@ -179,12 +219,10 @@ class UIManager:
         pygame.draw.rect(screen, self.panel_color, rect)
         pygame.draw.line(screen, self.accent_color, (0, self.topbar_height - 2), (width, self.topbar_height - 2), 2)
 
-        self._draw_card(screen, 16, 16, 190, 76, "Day", f"{state['elapsed_days']}")
-        self._draw_card(screen, 220, 16, 190, 76, "Budget", f"${state['money']}")
-        self._draw_card(screen, 424, 16, 190, 76, "Score", f"{state['score']:.1f}")
-        self._draw_card(screen, 628, 16, 190, 76, "Visitors", f"{state['visitors']}")
-        self._draw_card(screen, 832, 16, 190, 76, "Phase", f"{state['day_phase']} {state['elapsed_hours']:02d}:00")
-        self._draw_card(screen, 1036, 16, 190, 76, "Attractiveness", f"{state['environment']['attractiveness']:.2f}")
+        self._draw_card(screen, 16, 16, 280, 76, "Day", f"{state['elapsed_days']} · {state['elapsed_hours']:02d}:00")
+        self._draw_card(screen, 316, 16, 280, 76, "Budget", f"${state['money']}")
+        self._draw_card(screen, 616, 16, 280, 76, "Score", f"{state['score']:.1f}")
+        self._draw_card(screen, 916, 16, 280, 76, "Visitors", f"{state['visitors']}")
 
     def _draw_card(self, screen: "pygame.Surface", x: int, y: int, w: int, h: int, title: str, value: str) -> None:
         card = pygame.Rect(x, y, w, h)
@@ -206,14 +244,34 @@ class UIManager:
 
         button_y = y + 78
         button_height = 42
+        child_height = 36
         button_width = self.sidebar_width - 32
+        child_width = button_width - 20
+        self._visible_buttons = []
+
         for button in self.buttons:
+            if button.group_key is not None:
+                marker = "-" if self.expanded_group == button.group_key else "+"
+                button.label = f"{marker} {button.base_label}"
+
             button.rect = pygame.Rect(x + 16, button_y, button_width, button_height)
             pygame.draw.rect(screen, self.card_color, button.rect, border_radius=10)
             pygame.draw.rect(screen, self.accent_color, button.rect, 1, border_radius=10)
             label = self.action_font.render(button.label, True, self.text_color)
             screen.blit(label, (button.rect.x + 16, button.rect.y + 10))
-            button_y += button_height + 10
+            self._visible_buttons.append(button)
+            button_y += button_height + 8
+
+            if button.group_key is not None and self.expanded_group == button.group_key:
+                for child in self.group_children[button.group_key]:
+                    child.rect = pygame.Rect(x + 36, button_y, child_width, child_height)
+                    pygame.draw.rect(screen, (28, 40, 68), child.rect, border_radius=8)
+                    pygame.draw.rect(screen, self.accent_color, child.rect, 1, border_radius=8)
+                    child_label = self.font.render(child.label, True, self.text_color)
+                    screen.blit(child_label, (child.rect.x + 14, child.rect.y + 9))
+                    self._visible_buttons.append(child)
+                    button_y += child_height + 6
+                button_y += 4
 
     def _draw_right_panel(self, screen: "pygame.Surface", state: Dict[str, Any], screen_width: int, screen_height: int) -> None:
         panel_x = self.sidebar_width + 16
@@ -319,7 +377,6 @@ class UIManager:
 
         self._draw_info_block(screen, content_x + card_w + 16, bottom_y, "System Info", [
             f"Visitors: {state['visitors']}",
-            f"Phase: {state['day_phase']}",
             "Next Tick: +10s",
         ], card_w, 120)
 
