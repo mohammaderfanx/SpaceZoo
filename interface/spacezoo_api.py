@@ -170,6 +170,7 @@ class SpaceZooAPI:
                 "hunger": float(animal.get_hunger_percent()),
                 "energy": float(animal.energy),
                 "is_sick": animal.illness is not None,
+                "illness": animal.illness.name if animal.illness is not None else None,
                 "awake": animal.awake,
                 "position": (animal.x, animal.y),
                 "gender": animal.gender.value,

@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from interface.spacezoo_api import SpaceZooAPI
 from frontend.ui_manager import UIManager
 
-NATIVE_SIZE = (1260, 960)
+NATIVE_SIZE = (1260, 1120)
 
 
 def _initial_window_size(native_size: "Tuple[int, int]") -> "Tuple[int, int]":

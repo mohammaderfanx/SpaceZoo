@@ -22,7 +22,7 @@ import pygame
 from interface.spacezoo_api import SpaceZooAPI
 from frontend.ui_manager import UIManager
 
-NATIVE_SIZE = (1260, 960)
+NATIVE_SIZE = (1260, 1120)
 
 
 def main() -> None:

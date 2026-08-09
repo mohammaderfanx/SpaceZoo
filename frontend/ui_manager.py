@@ -179,11 +179,12 @@ class UIManager:
         pygame.draw.rect(screen, self.panel_color, rect)
         pygame.draw.line(screen, self.accent_color, (0, self.topbar_height - 2), (width, self.topbar_height - 2), 2)
 
-        self._draw_card(screen, 16, 16, 220, 76, "Budget", f"${state['money']}")
-        self._draw_card(screen, 250, 16, 220, 76, "Score", f"{state['score']:.1f}")
-        self._draw_card(screen, 484, 16, 220, 76, "Visitors", f"{state['visitors']}")
-        self._draw_card(screen, 718, 16, 220, 76, "Phase", f"{state['day_phase']} {state['elapsed_hours']:02d}:00")
-        self._draw_card(screen, 952, 16, 220, 76, "Attractiveness", f"{state['environment']['attractiveness']:.2f}")
+        self._draw_card(screen, 16, 16, 190, 76, "Day", f"{state['elapsed_days']}")
+        self._draw_card(screen, 220, 16, 190, 76, "Budget", f"${state['money']}")
+        self._draw_card(screen, 424, 16, 190, 76, "Score", f"{state['score']:.1f}")
+        self._draw_card(screen, 628, 16, 190, 76, "Visitors", f"{state['visitors']}")
+        self._draw_card(screen, 832, 16, 190, 76, "Phase", f"{state['day_phase']} {state['elapsed_hours']:02d}:00")
+        self._draw_card(screen, 1036, 16, 190, 76, "Attractiveness", f"{state['environment']['attractiveness']:.2f}")
 
     def _draw_card(self, screen: "pygame.Surface", x: int, y: int, w: int, h: int, title: str, value: str) -> None:
         card = pygame.Rect(x, y, w, h)
@@ -249,7 +250,7 @@ class UIManager:
                     f"{a['hunger']:.0f}%",
                     f"{a['health'] * 100:.0f}%",
                     f"{a['energy'] * 100:.0f}%",
-                    "Sick" if a["is_sick"] else ("Hungry" if a["hunger"] >= 50 else "Healthy"),
+                    a["illness"] if a["is_sick"] else ("Hungry" if a["hunger"] >= 50 else "Healthy"),
                     a["gender"].capitalize(),
                 ]
                 for a in state["animals"][:5]
@@ -319,9 +320,17 @@ class UIManager:
         self._draw_info_block(screen, content_x + card_w + 16, bottom_y, "System Info", [
             f"Visitors: {state['visitors']}",
             f"Phase: {state['day_phase']}",
-            f"Day: {state['elapsed_days']}",
             "Next Tick: +10s",
         ], card_w, 120)
+
+    def _fit_text(self, text: str, max_width: int) -> str:
+        """Truncates text with an ellipsis so it never overflows into the next column."""
+        if self.font.size(text)[0] <= max_width:
+            return text
+        trimmed = text
+        while trimmed and self.font.size(trimmed + "...")[0] > max_width:
+            trimmed = trimmed[:-1]
+        return f"{trimmed}..." if trimmed else "..."
 
     def _draw_data_table(
         self,
@@ -356,7 +365,10 @@ class UIManager:
             if row_index % 2 == 0:
                 pygame.draw.rect(screen, (24, 40, 78), row_rect)
             for col_index, cell in enumerate(row[:col_count]):
-                screen.blit(self.font.render(cell, True, self.text_color), (x + 12 + col_index * col_width, row_y))
+                is_last_col = col_index == col_count - 1
+                available = (width - 24 - col_index * col_width) if is_last_col else col_width
+                fitted = self._fit_text(cell, available - 8)
+                screen.blit(self.font.render(fitted, True, self.text_color), (x + 12 + col_index * col_width, row_y))
             row_y += 24
 
     def _draw_info_block(self, screen: "pygame.Surface", x: int, y: int, title: str, lines: List[str], width: int = 240, height: int = 100) -> None:
