@@ -1,5 +1,9 @@
 """
-Sprite manager for SpaceZoo frontend.
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
+Sprite manager for SimZoo frontend.
 Renders placeholder rectangles for creatures, staff and visitors using the API state.
 """
 

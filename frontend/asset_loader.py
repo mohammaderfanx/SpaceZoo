@@ -1,4 +1,8 @@
 """
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
 AssetLoader (Singleton) for the frontend.
 
 This module provides image loading, caching, and scaling for the Pygame frontend.
@@ -84,7 +88,7 @@ class AssetLoader:
         """
         map_dir = self.assets_root / "map"
         # try common extensions
-        candidates = list(map_dir.glob("SpaceZooBase.*")) if map_dir.exists() else []
+        candidates = list(map_dir.glob("SimZooBase.*")) if map_dir.exists() else []
         if candidates:
             path = candidates[0]
             return self.load_image(path, self.map_size)

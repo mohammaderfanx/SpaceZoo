@@ -1,5 +1,9 @@
 """
-DatabaseManager for DinoZoo / SpaceZoo.
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
+DatabaseManager for DinoZoo / SimZoo.
 Manages the SQLite database connection, initializes the schema (database/schema.sql),
 and persists/restores the full backend simulation state so a session survives a restart.
 """
@@ -16,11 +20,11 @@ class DatabaseManager:
         """
         Initialize the DatabaseManager and ensure the database file and schema exist.
 
-        :param db_path: Optional path to the SQLite database file. Defaults to 'database/spacezoo.db'.
+        :param db_path: Optional path to the SQLite database file. Defaults to 'database/simzoo.db'.
         """
         if db_path is None:
             base_dir = Path(__file__).parent.resolve()
-            db_path = str(base_dir / "spacezoo.db")
+            db_path = str(base_dir / "simzoo.db")
 
         self.db_path = db_path
         self._init_db()
@@ -51,7 +55,7 @@ class DatabaseManager:
     def save_full_state(self, state: Dict[str, Any]) -> None:
         """Persists the full zoo state, replacing whatever was previously saved.
 
-        :param state: dict shaped like SpaceZooAPI._serialize_state_for_save()'s output.
+        :param state: dict shaped like SimZooAPI._serialize_state_for_save()'s output.
         """
         with self._get_connection() as conn:
             conn.execute(

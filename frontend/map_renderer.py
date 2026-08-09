@@ -1,5 +1,9 @@
 """
-Map renderer for SpaceZoo frontend.
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
+Map renderer for SimZoo frontend.
 Draws a simple 21x16 grid using Pygame and loads the background map image.
 The frontend layer does not import backend or database modules.
 """

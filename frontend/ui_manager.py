@@ -1,12 +1,16 @@
 """
-UI manager for SpaceZoo frontend.
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
+UI manager for SimZoo frontend.
 Implements the main dashboard and sidebar controls.
-All data is fetched from `SpaceZooAPI`.
+All data is fetched from `SimZooAPI`.
 """
 
 import pygame
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from interface.spacezoo_api import SpaceZooAPI
+from interface.simzoo_api import SimZooAPI
 
 
 class UIButton:
@@ -26,7 +30,7 @@ class UIButton:
 
 
 class UIManager:
-    """Render and handle the SpaceZoo frontend dashboard UI."""
+    """Render and handle the SimZoo frontend dashboard UI."""
 
     def __init__(self) -> None:
         self.font: pygame.font.Font | None = None
@@ -41,7 +45,7 @@ class UIManager:
         self.secondary_text = (180, 190, 210)
         self.sidebar_width = 280
         self.topbar_height = 110
-        self.message: str = "Welcome to SpaceZoo UI Preview"
+        self.message: str = "Welcome to SimZoo UI Preview"
         self.message_timer = 0.0
         self.buttons: List[UIButton] = []
         self.weather_options = ["SUNNY", "CLOUDY", "RAINY"]
@@ -170,7 +174,7 @@ class UIManager:
     def _action_toggle_weather(self) -> Dict[str, Any]:
         return self._api_action(lambda api: api.change_weather(self.weather_options[self.current_weather_index]))
 
-    def _api_action(self, callback: Callable[[SpaceZooAPI], Dict[str, Any]]) -> Dict[str, Any]:
+    def _api_action(self, callback: Callable[[SimZooAPI], Dict[str, Any]]) -> Dict[str, Any]:
         try:
             result = callback(self._api_reference)
             success = result.get("success", False)
@@ -183,7 +187,7 @@ class UIManager:
         except Exception as exc:
             return {"success": False, "message": f"Action failed: {exc}"}
 
-    def process_event(self, event: "pygame.event.Event", api: SpaceZooAPI) -> None:
+    def process_event(self, event: "pygame.event.Event", api: SimZooAPI) -> None:
         """Handle user input events for dashboard buttons and UI interactions."""
         self._ensure_fonts()
         self._api_reference = api
@@ -204,7 +208,7 @@ class UIManager:
             self.message = "Press buttons to control the zoo."
             self.message_timer = 2.0
 
-    def draw(self, screen: "pygame.Surface", api: SpaceZooAPI, screen_width: int, screen_height: int) -> None:
+    def draw(self, screen: "pygame.Surface", api: SimZooAPI, screen_width: int, screen_height: int) -> None:
         """Render the dashboard overlay and its panels on the game screen."""
         self._ensure_fonts()
         panel_state = api.get_panel_state()
@@ -240,7 +244,7 @@ class UIManager:
         rect = pygame.Rect(x, y, self.sidebar_width, screen.get_height() - y)
         pygame.draw.rect(screen, self.panel_color, rect)
 
-        title = self.title_font.render("Space Zoo", True, self.accent_color)
+        title = self.title_font.render("Sim Zoo", True, self.accent_color)
         screen.blit(title, (x + 16, y + 16))
         subtitle = self.font.render("Dashboard", True, self.secondary_text)
         screen.blit(subtitle, (x + 16, y + 16 + 34))

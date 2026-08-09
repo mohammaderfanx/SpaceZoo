@@ -1,5 +1,9 @@
 """
-Facade layer for SpaceZoo.
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
+Facade layer for SimZoo.
 
 This class provides the only bridge between frontend and backend logic.
 It exposes native Python data structures only and hides backend implementation
@@ -23,8 +27,8 @@ from backend.zooManagement.medicine import Antibiotic
 from database.db_manager import DatabaseManager
 
 
-class SpaceZooAPI:
-    """Facade for the SpaceZoo game logic exposed to the frontend."""
+class SimZooAPI:
+    """Facade for the SimZoo game logic exposed to the frontend."""
 
     SPECIES_MAP = {
         "Eagle": Eagle,

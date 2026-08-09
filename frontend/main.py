@@ -1,7 +1,11 @@
 """
-Frontend entrypoint for SpaceZoo.
+author: Mohammad Rezaei
+date: 08.08.2026
+version: 1
+
+Frontend entrypoint for SimZoo.
 Initializes a Pygame window and runs the main loop.
-Imports the `SpaceZooAPI` as the only interface to the backend.
+Imports the `SimZooAPI` as the only interface to the backend.
 
 This is a dashboard-only view: no map background, no player sprite/movement.
 """
@@ -15,7 +19,7 @@ from typing import Tuple
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Normal imports follow.
-from interface.spacezoo_api import SpaceZooAPI
+from interface.simzoo_api import SimZooAPI
 from frontend.ui_manager import UIManager
 
 NATIVE_SIZE = (1260, 1000)
@@ -53,10 +57,10 @@ def main() -> None:
     game_surface = pygame.Surface(native_size)
 
     screen = pygame.display.set_mode(_initial_window_size(native_size), pygame.RESIZABLE)
-    pygame.display.set_caption("SpaceZoo")
+    pygame.display.set_caption("SimZoo")
 
     clock = pygame.time.Clock()
-    api = SpaceZooAPI()
+    api = SimZooAPI()
     ui_manager = UIManager()
 
     running = True

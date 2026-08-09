@@ -1,4 +1,8 @@
--- DinoZoo / SpaceZoo savegame schema.
+--author: Mohammad Rezaei
+--date: 08.08.2026
+--version: 1
+
+-- DinoZoo / SimZoo savegame schema.
 -- Persists the state of backend.core.simulationEngine.SimulationEngine /
 -- backend.core.zoo.Zoo so a session can be restored on the next launch.
 
