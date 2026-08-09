@@ -1,57 +1,88 @@
-# SpaceZoo — Digitaler Zwilling (Zoo-Simulation)
+# SpaceZoo
 
-Kurzbeschreibung
------------------
-Dieses Projekt implementiert eine Zoo-Simulation in Python (Pygame) nach den Regeln in `ARCHITECTURE.md`.
+SpaceZoo is a zoo-management simulation written in Python. A backend simulation
+engine models animals, enclosures, staff, feeding, illness, and breeding; a
+Pygame frontend renders the state as a dashboard and lets you manage the zoo
+in real time. Zoo state is persisted to a local SQLite database, so a session
+survives a restart.
 
-Autor / Hinweise
------------------
-- Autor: <DEIN NAME HIER>
-- Individueller Schwerpunkt: <DEINER INDIVIDUELLE SCHWERPUNKT HIER>
+## Features
 
-Voraussetzungen
--------------
-- Python 3.14
-- Ein Terminal auf Linux/macOS (Windows-Anweisungen analog)
+- Animal simulation: species (`Eagle`, `Wolf`, `Rabbit`), lifecycle, eggs,
+  illness, and environmental factors
+- Zoo management: enclosures, staff (`Caretaker`, `Vet`, `Cashier`), food and
+  medicine inventory
+- A `SpaceZooAPI` facade (`interface/spacezoo_api.py`) that is the sole bridge
+  between the frontend and backend logic
+- Pygame dashboard UI with buy/hire menus, illness and day-count indicators
+- SQLite persistence via `database/db_manager.py`
 
-Schnellstart
------------
-1. Virtuelle Umgebung anlegen und aktivieren:
+## Project structure
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
+```
+backend/            Simulation engine, animal simulation, zoo management
+database/            SQLite persistence (db_manager.py, schema.sql)
+interface/           SpaceZooAPI facade — the only frontend/backend bridge
+frontend/            Pygame UI (entry point, renderer, input handling, assets)
+docs/backend/        Class diagram and design notes
 ```
 
-2. Abhängigkeiten installieren:
+## Prerequisites
 
-```bash
-pip install -r requirements.txt
-```
+- Python 3.12+
+- A terminal on Linux/macOS/Windows
 
-3. Anwendung starten (Pygame-Fenster):
+## Installation
+
+1. Create and activate a virtual environment:
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Running the app
+
+Start the Pygame frontend:
 
 ```bash
 python frontend/main.py
 ```
 
-Hinweise
--------
-- Die Anwendung erwartet die Projektstruktur wie in `ARCHITECTURE.md` beschrieben.
-- Die Persistenz nutzt SQLite unter `database/spacezoo.db`.
-- Das Frontend darf nur die `SpaceZooAPI` aus `interface/spacezoo_api.py` nutzen.
-- Bei fehlenden Assets erzeugt der `AssetLoader` Platzhaltergrafiken.
+This opens a resizable window with the zoo dashboard. Close the window or
+press `Ctrl+C` in the terminal to quit.
 
-Beenden
-------
-- Schließe das Pygame-Fenster oder sende `Ctrl+C` im Terminal.
+### Development auto-reload
 
-Weiterführende Aktionen
-----------------------
-- `python -m pytest` (falls Tests ergänzt wurden)
-- Vor dem Commit: `pip freeze > requirements.txt` um exakte Versionen zu pinnen (optional)
-- Headless render in Codespaces:
-  ```bash
-  python frontend/headless_screenshot.py
-  ```
-  This generates `codespaces_screenshot.png` in the project root.
+`watch_and_run.py` restarts `frontend/main.py` automatically whenever a
+tracked `.py` file or asset changes:
+
+```bash
+python watch_and_run.py
+```
+
+### Headless screenshot (e.g. in Codespaces/CI)
+
+To render a single frame to a PNG without a display:
+
+```bash
+python frontend/headless_screenshot.py
+```
+
+This writes `codespaces_screenshot.png` to the project root.
+
+## Data & persistence
+
+Zoo state is stored in `database/spacezoo.db` (SQLite), created automatically
+on first run from `database/schema.sql`. Delete this file to reset the zoo to
+a fresh state.
+
+## Documentation
+
+Further design notes and a class diagram live under [`docs/backend/`](docs/backend/).
