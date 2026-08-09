@@ -61,6 +61,7 @@ class SimulationEngine:
         self.decreaseSaturation()
         self.decreaseHealth()
         self.decreaseEnergy()
+        self.decreaseCleanliness()
         self.layEggs()
         self.eggsHatch()
         self.catchIllnesses()
@@ -180,9 +181,10 @@ class SimulationEngine:
         for egg in hatchedEggs:
             gender = random.choice(list(Gender))
             newId = f"{egg.species.__name__}-{self.elapsedDays}-{len(self.zoo.animals)}"
-            newAnimal = egg.species(newId, egg.species.__name__, self.elapsedDays, gender)
-            self.zoo.animals.append(newAnimal)
-            self.zoo.eggs.remove(egg)
+            newAnimal = egg.species(newId, self.elapsedDays, gender)
+            result = self.zoo.addAnimal(newAnimal)
+            if result["success"]:
+                self.zoo.eggs.remove(egg)
 
     def catchIllnesses(self):
         """Randomly assigns illnesses to animals, more likely where a sick animal already shares the enclosure.
@@ -249,18 +251,14 @@ class SimulationEngine:
         if len(enclosuresToClean) == 0:
             return 
         
-        availableCaretakers = self.zoo.getCaretakers()
+        availableCaretakers = self.zoo.getCaretakers(self.elapsedHours)
         if len(availableCaretakers) == 0:
             return 
-        
+
         for indexEnclosure in range(len(enclosuresToClean)):
             currentEnclosure = enclosuresToClean[indexEnclosure]
             currentCaretaker = availableCaretakers[indexEnclosure % len(availableCaretakers)]
             currentCaretaker.cleanEnclosure(currentEnclosure)
-        availableCaretakers = self.zoo.getCaretakers()
-        
-        
-
 
     def decreaseBusyFor(self):
         """Reduces staff's remaining busy time by one tick, freeing them up again once it hits 0.

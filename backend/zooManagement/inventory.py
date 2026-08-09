@@ -6,7 +6,7 @@ version: 1
 
 from typing import List
 from backend.zooManagement.food import FoodItem, Food
-from backend.zooManagement.medicine import Medicine
+from backend.zooManagement.medicine import Medicine, MedicineItem
 from backend.animalSimulation.illness import Illness
 
 class Inventory:
@@ -14,7 +14,7 @@ class Inventory:
 
     def __init__(self):
         self.food: List[FoodItem] = []
-        self.medicine: List[Medicine] = []
+        self.medicine: List[MedicineItem] = []
 
     def checkForMedicineForSpecificIllness(self, illness: type[Illness]) -> bool:
         """Returns whether the inventory holds medicine for the given illness.
@@ -30,7 +30,7 @@ class Inventory:
             matching medicine in stock -> returns True
             no matching medicine in stock -> returns False
         """
-        medicineForIllness = [medicine for medicine in self.medicine if type[medicine.illness] == illness]
+        medicineForIllness = [item for item in self.medicine if type(item.type.illness) == illness]
         return len(medicineForIllness) > 0
 
     def listOfFoodInCategory(self, category: type[Food]) -> List[FoodItem]:

@@ -23,7 +23,7 @@ from backend.animalSimulation.illness import Illness, ExampleIllness
 from backend.zooManagement.employee import Caretaker, Vet, Cashier, WorkingHours
 from backend.zooManagement.enclosure import Enclosure
 from backend.zooManagement.food import Meat, Hay, Fish, FoodItem
-from backend.zooManagement.medicine import Antibiotic
+from backend.zooManagement.medicine import Antibiotic, MedicineItem
 from database.db_manager import DatabaseManager
 
 
@@ -161,7 +161,7 @@ class SimZooAPI:
 
         for row in data["medicine_items"]:
             med_cls = self.MEDICINE_MAP[row["medicine_type"]]
-            zoo.inventory.medicine.extend(med_cls() for _ in range(row["quantity"]))
+            zoo.inventory.medicine.extend(MedicineItem(med_cls(), 1) for _ in range(row["quantity"]))
 
         for row in data["eggs"]:
             species_cls = self.SPECIES_MAP[row["species"]]
@@ -185,8 +185,8 @@ class SimZooAPI:
             for animal in enclosure.animals
         }
         medicine_counts: Dict[str, int] = {}
-        for medicine in zoo.inventory.medicine:
-            medicine_counts[medicine.name] = medicine_counts.get(medicine.name, 0) + 1
+        for item in zoo.inventory.medicine:
+            medicine_counts[item.type.name] = medicine_counts.get(item.type.name, 0) + 1
 
         return {
             "budget": int(zoo.budget),
@@ -464,11 +464,7 @@ class SimZooAPI:
         animal_cls = self.SPECIES_MAP[species]
         gender = random.choice([Gender.FEMALE, Gender.MALE])
         name = f"{species}_{random.randint(1000,9999)}"
-        new_animal = animal_cls(name, self.sim.elapsedDays, gender)
-        if self.sim.zoo.budget < new_animal.price:
-            return {"success": False, "message": "Not enough money."}
-        self.sim.zoo.buyNewAnimal(animal_cls, name, self.sim.elapsedDays, gender)
-        return {"success": True, "message": f"Bought {species}."}
+        return self.sim.zoo.buyNewAnimal(animal_cls, name, self.sim.elapsedDays, gender)
 
     def buy_food(self, food_type: str, weight: int = 5) -> Dict[str, Any]:
         """Purchase food of a given type and weight if the zoo has sufficient budget.
@@ -487,10 +483,7 @@ class SimZooAPI:
         if food_type not in self.FOOD_MAP:
             return {"success": False, "message": "Unknown food type."}
         food_cls = self.FOOD_MAP[food_type]
-        if self.sim.zoo.budget < food_cls().pricePerKg * weight:
-            return {"success": False, "message": "Not enough money."}
-        self.sim.zoo.buyFood(food_cls, weight, self.sim.elapsedDays)
-        return {"success": True, "message": f"Bought {weight}kg {food_type}."}
+        return self.sim.zoo.buyFood(food_cls, weight, self.sim.elapsedDays)
 
     def buy_medicine(self, medicine_type: str, quantity: int = 1) -> Dict[str, Any]:
         """Purchase medicine items and add them to the zoo inventory.
@@ -510,12 +503,7 @@ class SimZooAPI:
             return {"success": False, "message": "Unknown medicine type."}
         med_cls = self.MEDICINE_MAP[medicine_type]
         med_item = med_cls()
-        total_cost = med_item.price * quantity
-        if self.sim.zoo.budget < total_cost:
-            return {"success": False, "message": "Not enough money."}
-        self.sim.zoo.budget -= total_cost
-        self.sim.zoo.inventory.medicine.extend([med_item] * quantity)
-        return {"success": True, "message": f"Bought {quantity}x {medicine_type}."}
+        return self.sim.zoo.buyMedicine(med_item, quantity)
 
     def sell_animal(self) -> Dict[str, Any]:
         """Sell one animal from the zoo inventory if available.
@@ -529,13 +517,9 @@ class SimZooAPI:
         """
         if not self.sim.zoo.animals:
             return {"success": False, "message": "No animals available to sell."}
-        animal = self.sim.zoo.animals.pop()
-        self.sim.zoo.budget += int(animal.price / 2)
-        for enclosure in self.sim.zoo.enclosures:
-            if animal in enclosure.animals:
-                enclosure.animals.remove(animal)
-                break
-        return {"success": True, "message": f"Sold {animal.name}."}
+        animal = self.sim.zoo.animals[-1]
+        result = self.sim.zoo.sellAnimal(animal)
+        return result
 
     def fire_staff(self) -> Dict[str, Any]:
         """Fire one staff member from the zoo if any exist."""
@@ -549,29 +533,20 @@ class SimZooAPI:
         sick_animals = [animal for animal in self.sim.zoo.animals if animal.illness is not None]
         if not sick_animals:
             return {"success": False, "message": "No sick animals found."}
-        if not self.sim.zoo.inventory.medicine:
-            return {"success": False, "message": "No medicine in inventory."}
         animal = sick_animals[0]
-        medicine = self.sim.zoo.inventory.medicine.pop(0)
-        animal.illness = None
-        animal.health = min(1.0, animal.health + 0.3)
-        return {"success": True, "message": f"Healed {animal.name}."}
+        return self.sim.zoo.healAnimal(animal)
 
     def hire_staff(self, staff_type: str, shift_start: int = 8, shift_end: int = 18) -> Dict[str, Any]:
         """Hire a new staff member of the chosen type for the given shift if budget allows."""
         if staff_type not in self.STAFF_MAP:
             return {"success": False, "message": "Unknown staff type."}
-        if self.sim.zoo.budget < 10:
-            return {"success": False, "message": "Not enough money."}
         staff_cls = self.STAFF_MAP[staff_type]
         name = f"{staff_type}_{random.randint(1000,9999)}"
         working_hours = WorkingHours(shift_start, shift_end)
-        before = len(self.sim.zoo.staff)
-        self.sim.zoo.hireEmployee(staff_cls, name, working_hours)
-        if len(self.sim.zoo.staff) == before:
-            return {"success": False, "message": "Could not hire (invalid shift)."}
-        self.sim.zoo.budget -= 10
-        return {"success": True, "message": f"Hired {staff_type} for {shift_start:02d}:00-{shift_end:02d}:00."}
+        result = self.sim.zoo.hireEmployee(staff_cls, name, working_hours)
+        if result["success"]:
+            result["message"] = f"Hired {staff_type} for {shift_start:02d}:00-{shift_end:02d}:00."
+        return result
 
     def feed_animal(self) -> Dict[str, Any]:
         """Feed the first hungry animal fully."""

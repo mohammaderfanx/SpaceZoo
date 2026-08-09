@@ -144,19 +144,23 @@ class Cashier(Employee):
     def __init__(self, name: str, workingHours: WorkingHours):
         super().__init__(name, workingHours, salary = 10)
 
-    def sellTicket(self):
-        """Sells a ticket to a visitor.
+    def sellTicket(self, zoo, ticket_price: int = 5) -> None:
+        """Sells a ticket to a visitor and updates zoo budget.
 
         Args:
-            self
+            zoo: the zoo object to update when a ticket is sold
+            ticket_price: price charged for one ticket
 
         Tests:
             visitor buys a ticket -> visitor count and budget increase
-            no visitor present -> no-op
+            cashier busy flag increments after sale
         """
         self.busyFor += 1
+        zoo.visitors += 1
+        zoo.budget += ticket_price
 
     def performDuty(self, target: object) -> None:
-        """Perform cashier duty by selling a ticket."""
-        self.sellTicket()
+        """Perform cashier duty by selling a ticket to the provided zoo."""
+        if target is not None:
+            self.sellTicket(target)
 

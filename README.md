@@ -30,8 +30,14 @@ docs/frontend/       Frontend class diagrams and UI design notes
 
 ## Prerequisites
 
-- Python 3.12+
+- Python 3.14+
 - A terminal on Linux/macOS/Windows
+
+## Contribution focus
+
+- Backend simulation and animal systems implemented by Jasmin.
+- Frontend, interface, and database support implemented by Mohammad.
+- This submission documents the Pygame dashboard, UI interaction, and the `SimZooAPI` facade while preserving the backend simulation architecture.
 
 ## Installation
 

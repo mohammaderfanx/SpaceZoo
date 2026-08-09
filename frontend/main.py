@@ -20,6 +20,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Normal imports follow.
 from interface.simzoo_api import SimZooAPI
+from frontend.asset_loader import AssetLoader
+from frontend.input_handler import InputHandler
+from frontend.map_renderer import MapRenderer
+from frontend.sprite_manager import SpriteManager
 from frontend.ui_manager import UIManager
 
 NATIVE_SIZE = (1260, 1000)
@@ -62,6 +66,9 @@ def main() -> None:
     clock = pygame.time.Clock()
     api = SimZooAPI()
     ui_manager = UIManager()
+    input_handler = InputHandler()
+    map_renderer = MapRenderer()
+    sprite_manager = SpriteManager()
 
     running = True
     last_time = time.time()
@@ -83,6 +90,7 @@ def main() -> None:
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             ui_manager.process_event(event, api)
+            input_handler.process_event(event, api)
 
         now = time.time()
         delta = now - last_time
@@ -90,6 +98,12 @@ def main() -> None:
 
         # Call simulation tick (delta in seconds)
         api.tick(delta)
+        input_handler.handle_held_keys(delta, api)
+
+        # Draw map and entities behind the UI
+        map_renderer.draw_background(game_surface)
+        zoo_state = api.get_zoo_state()
+        sprite_manager.draw_entities(game_surface, zoo_state, map_renderer.tile_size)
 
         # Draw UI (dashboard)
         ui_manager.draw(game_surface, api, native_size[0], native_size[1])

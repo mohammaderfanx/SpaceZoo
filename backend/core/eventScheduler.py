@@ -36,7 +36,7 @@ class EventScheduler:
         if elapsedHours == 0:
             self.ageUpAnimals(elapsedDays)
         if elapsedHours == 8:
-            self.visitorsArrive()
+            self.visitorsArrive(elapsedHours)
         if elapsedHours == 17:
             self.visitorsLeave()
         self.feedAnimals(elapsedHours, elapsedDays)
@@ -55,7 +55,7 @@ class EventScheduler:
         if len(animalsToFeed) == 0:
             return
 
-        availableCaretakers = self.zoo.getCaretakers()
+        availableCaretakers = self.zoo.getCaretakers(elapsedHours)
         if len(availableCaretakers) == 0:
             return
 
@@ -138,26 +138,25 @@ class EventScheduler:
                 animal.age(elapsedDays)
 
 
-    def visitorsArrive(self):
+    def visitorsArrive(self, elapsedHours: int):
         """Lets visitors into the zoo for cashiers to sell tickets to.
 
         Args:
             self
+            elapsedHours: current hour used to ensure cashiers are on shift
 
         Tests:
             cashiers available -> visitors are let in and tickets get sold
             no cashiers available -> visitors cannot buy tickets
         """
-        availableCashiers = self.zoo.getCashiers()
+        availableCashiers = self.zoo.getCashiers(elapsedHours)
         if len(availableCashiers) == 0:
             return
         ticketPrice = 5
         newVisitors = int(self.zoo.score)
         for index in range(newVisitors):
             cashier = availableCashiers[index % len(availableCashiers)]
-            cashier.sellTicket()
-            self.zoo.visitors += 1
-            self.zoo.budget += ticketPrice
+            cashier.sellTicket(self.zoo, ticketPrice)
 
     def visitorsLeave(self):
         """Sends visitors home.
