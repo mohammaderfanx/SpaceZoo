@@ -65,28 +65,23 @@ class SpaceZooAPI:
             omnivore_enclosure,
         ])
 
-        # Add demo animals with asset names matching the creature folders
+        # Seed a starter roster using only the species defined in backend/.
         demo_animals = [
-            (Rabbit("Birdy", 0, Gender.FEMALE), herbivore_enclosure, (3, 5)),
-            (Rabbit("Liz", 0, Gender.FEMALE), herbivore_enclosure, (5, 7)),
-            (Wolf("Mal", 0, Gender.MALE), carnivore_enclosure, (10, 6)),
-            (Eagle("Pinky", 0, Gender.FEMALE), omnivore_enclosure, (13, 4)),
-            (Eagle("Sami", 0, Gender.MALE), omnivore_enclosure, (15, 5)),
+            (Rabbit("Rabbit-1", 0, Gender.FEMALE), herbivore_enclosure),
+            (Rabbit("Rabbit-2", 0, Gender.FEMALE), herbivore_enclosure),
+            (Wolf("Wolf-1", 0, Gender.MALE), carnivore_enclosure),
+            (Eagle("Eagle-1", 0, Gender.FEMALE), omnivore_enclosure),
+            (Eagle("Eagle-2", 0, Gender.MALE), omnivore_enclosure),
         ]
 
-        for animal, enclosure, position in demo_animals:
-            animal.x, animal.y = position
-            animal.species = animal.name
+        for animal, enclosure in demo_animals:
             self.sim.zoo.animals.append(animal)
             enclosure.animals.append(animal)
 
         # Add staff for feeding and ticket sales
         caretaker = Caretaker("Mira", WorkingHours(8, 18))
-        caretaker.x, caretaker.y = 2, 2
         cashier = Cashier("Noah", WorkingHours(8, 18))
-        cashier.x, cashier.y = 1, 3
         vet = Vet("Lina", WorkingHours(9, 17))
-        vet.x, vet.y = 3, 2
 
         self.sim.zoo.staff.extend([caretaker, cashier, vet])
 
@@ -180,7 +175,17 @@ class SpaceZooAPI:
                 "gender": animal.gender.value,
             })
 
-        staff = [member.to_dict() for member in self.sim.zoo.staff]
+        staff = [
+            {
+                "id": member.id,
+                "name": member.name,
+                "type": member.__class__.__name__,
+                "status": member.status,
+                "salary": member.salary,
+                "working_hours": (member.workingHours.startOfShift, member.workingHours.endOfShift),
+            }
+            for member in self.sim.zoo.staff
+        ]
         enclosures = [
             {
                 "number": enclosure.number,
@@ -388,17 +393,21 @@ class SpaceZooAPI:
         animal.health = min(1.0, animal.health + 0.3)
         return {"success": True, "message": f"Healed {animal.name}."}
 
-    def hire_staff(self, staff_type: str) -> Dict[str, Any]:
-        """Hire a new staff member of the chosen type if budget allows."""
+    def hire_staff(self, staff_type: str, shift_start: int = 8, shift_end: int = 18) -> Dict[str, Any]:
+        """Hire a new staff member of the chosen type for the given shift if budget allows."""
         if staff_type not in self.STAFF_MAP:
             return {"success": False, "message": "Unknown staff type."}
         if self.sim.zoo.budget < 10:
             return {"success": False, "message": "Not enough money."}
         staff_cls = self.STAFF_MAP[staff_type]
         name = f"{staff_type}_{random.randint(1000,9999)}"
+        working_hours = WorkingHours(shift_start, shift_end)
+        before = len(self.sim.zoo.staff)
+        self.sim.zoo.hireEmployee(staff_cls, name, working_hours)
+        if len(self.sim.zoo.staff) == before:
+            return {"success": False, "message": "Could not hire (invalid shift)."}
         self.sim.zoo.budget -= 10
-        self.sim.zoo.hireEmployee(staff_cls, name, WorkingHours(8, 18))
-        return {"success": True, "message": f"Hired {staff_type}."}
+        return {"success": True, "message": f"Hired {staff_type} for {shift_start:02d}:00-{shift_end:02d}:00."}
 
     def feed_animal(self) -> Dict[str, Any]:
         """Feed the first hungry animal fully."""
@@ -430,4 +439,3 @@ class SpaceZooAPI:
         x, y = self.player_position
         self.player_position = (max(0, x + dx), max(0, y + dy))
         return {"success": True, "message": "Player moved."}
-

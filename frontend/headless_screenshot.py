@@ -20,26 +20,20 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 import pygame
 from interface.spacezoo_api import SpaceZooAPI
-from frontend.map_renderer import MapRenderer
-from frontend.sprite_manager import SpriteManager
 from frontend.ui_manager import UIManager
+
+NATIVE_SIZE = (1260, 960)
 
 
 def main() -> None:
     pygame.init()
 
-    renderer = MapRenderer()
-    native_size = renderer.screen_size()
+    native_size = NATIVE_SIZE
     game_surface = pygame.Surface(native_size)
 
     api = SpaceZooAPI()
-    sprite_manager = SpriteManager()
     ui_manager = UIManager()
 
-    renderer.draw_background(game_surface)
-
-    state = api.get_zoo_state()
-    sprite_manager.draw_entities(game_surface, state, renderer.tile_size)
     ui_manager.draw(game_surface, api, native_size[0], native_size[1])
 
     screenshot_path = REPO_ROOT / "codespaces_screenshot.png"

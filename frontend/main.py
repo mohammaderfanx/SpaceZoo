@@ -1,7 +1,9 @@
 """
 Frontend entrypoint for SpaceZoo.
-Initializes a Pygame window (1260x960) and runs the main loop.
+Initializes a Pygame window and runs the main loop.
 Imports the `SpaceZooAPI` as the only interface to the backend.
+
+This is a dashboard-only view: no map background, no player sprite/movement.
 """
 import pygame
 import time
@@ -14,10 +16,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Normal imports follow.
 from interface.spacezoo_api import SpaceZooAPI
-from frontend.map_renderer import MapRenderer
-from frontend.input_handler import InputHandler
-from frontend.sprite_manager import SpriteManager
 from frontend.ui_manager import UIManager
+
+NATIVE_SIZE = (1260, 960)
 
 
 def _initial_window_size(native_size: "Tuple[int, int]") -> "Tuple[int, int]":
@@ -45,8 +46,7 @@ def main() -> None:
     """Initialize Pygame, create the frontend subsystems, and run the main loop."""
     pygame.init()
 
-    renderer = MapRenderer()
-    native_size = renderer.screen_size()
+    native_size = NATIVE_SIZE
 
     # Internal render surface in fixed native resolution; it is scaled each frame to
     # the current resizable window size.
@@ -57,21 +57,27 @@ def main() -> None:
 
     clock = pygame.time.Clock()
     api = SpaceZooAPI()
-    input_handler = InputHandler()
-    sprite_manager = SpriteManager()
     ui_manager = UIManager()
 
     running = True
     last_time = time.time()
 
     while running:
+        # Map the current window size back to the native surface's coordinate
+        # space so mouse clicks line up with what's actually on screen.
+        window_w, window_h = screen.get_size()
+        scale = min(window_w / native_size[0], window_h / native_size[1])
+        scaled_w = max(1, int(native_size[0] * scale))
+        scaled_h = max(1, int(native_size[1] * scale))
+        offset_x = (window_w - scaled_w) // 2
+        offset_y = (window_h - scaled_h) // 2
+        ui_manager.update_viewport(scale, (offset_x, offset_y))
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-            # Let input handler process keydown events
-            input_handler.process_event(event, api)
             ui_manager.process_event(event, api)
 
         now = time.time()
@@ -81,35 +87,15 @@ def main() -> None:
         # Call simulation tick (delta in seconds)
         api.tick(delta)
 
-        # Handle held keys for smooth movement
-        input_handler.handle_held_keys(delta, api)
-
-        # Render background map (fallbacks to grid if map missing)
-        renderer.draw_background(game_surface)
-
-        # Get full state and render sprites
-        try:
-            state = api.get_zoo_state()
-            sprite_manager.draw_entities(game_surface, state, renderer.tile_size)
-        except Exception:
-            state = None
-
-        # Draw UI (taskbar)
-        try:
-            ui_manager.draw(game_surface, api, native_size[0], native_size[1])
-        except Exception:
-            pass
+        # Draw UI (dashboard)
+        ui_manager.draw(game_surface, api, native_size[0], native_size[1])
 
         # Scale the native render surface to the current window size
         # (maintaining aspect ratio; excess space is black).
-        window_w, window_h = screen.get_size()
-        scale = min(window_w / native_size[0], window_h / native_size[1])
-        scaled_w = max(1, int(native_size[0] * scale))
-        scaled_h = max(1, int(native_size[1] * scale))
         scaled_surface = pygame.transform.smoothscale(game_surface, (scaled_w, scaled_h))
 
         screen.fill((0, 0, 0))
-        screen.blit(scaled_surface, ((window_w - scaled_w) // 2, (window_h - scaled_h) // 2))
+        screen.blit(scaled_surface, (offset_x, offset_y))
 
         pygame.display.flip()
 

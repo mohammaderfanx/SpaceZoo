@@ -39,7 +39,22 @@ class UIManager:
         self.buttons: List[UIButton] = []
         self.weather_options = ["SUNNY", "CLOUDY", "RAINY"]
         self.current_weather_index = 0
+        self.shift_options = [(6, 14), (8, 16), (8, 18), (14, 22), (22, 6)]
+        self.current_shift_index = 2
+        self.shift_button: UIButton | None = None
+        self._scale = 1.0
+        self._offset = (0, 0)
         self._build_buttons()
+
+    def update_viewport(self, scale: float, offset: Tuple[int, int]) -> None:
+        """Records how the native render surface is currently scaled/offset onto the window.
+
+        Mouse events arrive in window pixel coordinates, but button rects are laid out in
+        native surface coordinates, so clicks must be mapped back through this transform
+        before hit-testing.
+        """
+        self._scale = scale if scale else 1.0
+        self._offset = offset
 
     def _ensure_fonts(self) -> None:
         if self.font is None:
@@ -50,6 +65,7 @@ class UIManager:
             self.action_font = pygame.font.SysFont(None, 20, bold=True)
 
     def _build_buttons(self) -> None:
+        self.shift_button = UIButton(self._shift_label(), self._action_cycle_shift)
         self.buttons = [
             UIButton("Advance Tick", self._action_advance_tick),
             UIButton("Buy Eagle", lambda: self._action_buy_animal("Eagle")),
@@ -60,6 +76,7 @@ class UIManager:
             UIButton("Buy Hay", lambda: self._action_buy_food("Hay")),
             UIButton("Buy Fish", lambda: self._action_buy_food("Fish")),
             UIButton("Buy Medicine", self._action_buy_medicine),
+            self.shift_button,
             UIButton("Hire Caretaker", lambda: self._action_hire_staff("Caretaker")),
             UIButton("Hire Vet", lambda: self._action_hire_staff("Vet")),
             UIButton("Fire Staff", self._action_fire_staff),
@@ -68,6 +85,16 @@ class UIManager:
             UIButton("Clean Enclosure", self._action_clean_enclosure),
             UIButton("Toggle Weather", self._action_toggle_weather),
         ]
+
+    def _shift_label(self) -> str:
+        start, end = self.shift_options[self.current_shift_index]
+        return f"Shift: {start:02d}:00-{end:02d}:00"
+
+    def _action_cycle_shift(self) -> Dict[str, Any]:
+        self.current_shift_index = (self.current_shift_index + 1) % len(self.shift_options)
+        self.shift_button.label = self._shift_label()
+        start, end = self.shift_options[self.current_shift_index]
+        return {"success": True, "message": f"New hires will work {start:02d}:00-{end:02d}:00."}
 
     def _action_advance_tick(self) -> Dict[str, Any]:
         return self._api_action(lambda api: api.advance_tick())
@@ -79,7 +106,8 @@ class UIManager:
         return self._api_action(lambda api: api.buy_food(food_type, 5))
 
     def _action_hire_staff(self, staff_type: str) -> Dict[str, Any]:
-        return self._api_action(lambda api: api.hire_staff(staff_type))
+        start, end = self.shift_options[self.current_shift_index]
+        return self._api_action(lambda api: api.hire_staff(staff_type, start, end))
 
     def _action_sell_animal(self) -> Dict[str, Any]:
         return self._api_action(lambda api: api.sell_animal())
@@ -117,8 +145,12 @@ class UIManager:
         self._ensure_fonts()
         self._api_reference = api
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            native_pos = (
+                (event.pos[0] - self._offset[0]) / self._scale,
+                (event.pos[1] - self._offset[1]) / self._scale,
+            )
             for button in self.buttons:
-                if button.rect.collidepoint(event.pos):
+                if button.rect.collidepoint(native_pos):
                     result = button.action()
                     self.message = result.get("message", "Action executed.")
                     self.message_timer = 3.0
@@ -126,7 +158,7 @@ class UIManager:
                         self.current_weather_index = (self.current_weather_index + 1) % len(self.weather_options)
                     break
         if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB:
-            self.message = "Press buttons to control the zoo." 
+            self.message = "Press buttons to control the zoo."
             self.message_timer = 2.0
 
     def draw(self, screen: "pygame.Surface", api: SpaceZooAPI, screen_width: int, screen_height: int) -> None:
@@ -135,14 +167,12 @@ class UIManager:
         panel_state = api.get_panel_state()
         self._draw_background(screen, screen_width, screen_height)
         self._draw_topbar(screen, panel_state, screen_width)
-        self._draw_sidebar(screen, panel_state)
+        self._draw_sidebar(screen)
         self._draw_right_panel(screen, panel_state, screen_width, screen_height)
         self._draw_message_bar(screen, screen_width, screen_height)
 
     def _draw_background(self, screen: "pygame.Surface", width: int, height: int) -> None:
-        overlay = pygame.Surface((width, height), pygame.SRCALPHA)
-        overlay.fill((10, 14, 24, 120))
-        screen.blit(overlay, (0, 0))
+        screen.fill(self.bg_color)
 
     def _draw_topbar(self, screen: "pygame.Surface", state: Dict[str, Any], width: int) -> None:
         rect = pygame.Rect(0, 0, width, self.topbar_height)
@@ -162,7 +192,7 @@ class UIManager:
         screen.blit(self.font.render(title, True, self.secondary_text), (x + 12, y + 10))
         screen.blit(self.header_font.render(value, True, self.text_color), (x + 12, y + 36))
 
-    def _draw_sidebar(self, screen: "pygame.Surface", state: Dict[str, Any]) -> None:
+    def _draw_sidebar(self, screen: "pygame.Surface") -> None:
         x = 0
         y = self.topbar_height
         rect = pygame.Rect(x, y, self.sidebar_width, screen.get_height() - y)
@@ -183,14 +213,6 @@ class UIManager:
             label = self.action_font.render(button.label, True, self.text_color)
             screen.blit(label, (button.rect.x + 16, button.rect.y + 10))
             button_y += button_height + 10
-
-        info_x = x + 16
-        info_y = button_y + 20
-        self._draw_info_block(screen, info_x, info_y, "Environment", [
-            f"Weather: {state['environment']['weather']}",
-            f"Temp: {state['environment']['temperature']}°C",
-            f"Wind: {state['environment']['windSpeed']} km/h",
-        ], self.sidebar_width - 32, 120)
 
     def _draw_right_panel(self, screen: "pygame.Surface", state: Dict[str, Any], screen_width: int, screen_height: int) -> None:
         panel_x = self.sidebar_width + 16
@@ -225,8 +247,8 @@ class UIManager:
                     a["name"],
                     str(a["age_days"]),
                     f"{a['hunger']:.0f}%",
-                    f"{a['health']:.0f}%",
-                    f"{a['energy']:.0f}%",
+                    f"{a['health'] * 100:.0f}%",
+                    f"{a['energy'] * 100:.0f}%",
                     "Sick" if a["is_sick"] else ("Hungry" if a["hunger"] >= 50 else "Healthy"),
                     a["gender"].capitalize(),
                 ]
@@ -263,12 +285,12 @@ class UIManager:
             left_w,
             staff_box_h,
             "Personnel",
-            ["Type", "Status", "Position"],
+            ["Type", "Status", "Working hours"],
             [
                 [
                     s["type"],
                     s["status"],
-                    f"{s['position'][0]}, {s['position'][1]}",
+                    f"{s['working_hours'][0]:02d}:00-{s['working_hours'][1]:02d}:00",
                 ]
                 for s in state["staff"][:5]
             ],
