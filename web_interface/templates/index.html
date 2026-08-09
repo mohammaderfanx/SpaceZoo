@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DinoZoo</title>
+<style>
+  :root {
+    --bg: #f4f6f5;
+    --panel: #ffffff;
+    --border: #d9e0dc;
+    --text: #1b2420;
+    --muted: #5b6b63;
+    --accent: #2f7d5c;
+    --accent-text: #ffffff;
+    --danger: #b3432b;
+    --sick: #f4e3d5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181a;
+      --panel: #1d2224;
+      --border: #2c3436;
+      --text: #e7ece9;
+      --muted: #9aa8a1;
+      --accent: #4caf82;
+      --accent-text: #0c1210;
+      --danger: #e07a5f;
+      --sick: #3a2c22;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 0.75rem; font-size: 1.4rem; }
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.9rem;
+    min-width: 6rem;
+  }
+  .stat .label { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat .value { display: block; font-size: 1.15rem; font-weight: 600; }
+  main {
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+  }
+  .panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  tr.sick td { background: var(--sick); }
+  .empty { color: var(--muted); font-style: italic; font-size: 0.85rem; }
+  form { display: flex; flex-direction: column; gap: 0.5rem; }
+  form .row { display: flex; gap: 0.5rem; }
+  form .row > * { flex: 1; }
+  label { font-size: 0.75rem; color: var(--muted); }
+  select, input, button {
+    font: inherit;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    width: 100%;
+  }
+  button {
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .msg { font-size: 0.8rem; min-height: 1.1em; }
+  .msg.error { color: var(--danger); }
+  .msg.ok { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DinoZoo</h1>
+  <div class="stats" id="stats"></div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Animals</h2>
+    <table id="animals-table">
+      <thead><tr><th>Name</th><th>Species</th><th>Health</th><th>Hunger</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Staff</h2>
+    <table id="staff-table">
+      <thead><tr><th>Name</th><th>Role</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Enclosures</h2>
+    <table id="enclosures-table">
+      <thead><tr><th>#</th><th>Diet</th><th>Cleanliness</th><th>Occupancy</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Inventory</h2>
+    <table id="food-table">
+      <thead><tr><th>Food</th><th>Weight (kg)</th><th>Best before (day)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p style="font-size:0.85rem; margin-top:0.6rem;">
+      Medicine: <span id="medicine-count">0</span> &middot; Eggs: <span id="egg-count">0</span>
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Actions</h2>
+    <form data-endpoint="/api/tick" data-empty-body="true">
+      <button type="submit">Advance time now</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Buy animal</h2>
+    <form data-endpoint="/api/animals">
+      <label>Species
+        <select name="species">
+          <option value="eagle">Eagle</option>
+          <option value="wolf">Wolf</option>
+          <option value="rabbit">Rabbit</option>
+        </select>
+      </label>
+      <div class="row">
+        <label>Name<input type="text" name="name" placeholder="Unnamed"></label>
+        <label>Gender
+          <select name="gender"><option value="f">Female</option><option value="m">Male</option></select>
+        </label>
+      </div>
+      <button type="submit">Buy</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Add enclosure</h2>
+    <form data-endpoint="/api/enclosures">
+      <label>Diet
+        <select name="diet">
+          <option value="carnivore">Carnivore</option>
+          <option value="herbivore">Herbivore</option>
+          <option value="omnivore">Omnivore</option>
+        </select>
+      </label>
+      <label>Capacity<input type="number" name="capacity" value="5" min="1"></label>
+      <button type="submit">Add</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Hire employee</h2>
+    <form data-endpoint="/api/staff">
+      <label>Role
+        <select name="role">
+          <option value="caretaker">Caretaker</option>
+          <option value="vet">Vet</option>
+          <option value="cashier">Cashier</option>
+        </select>
+      </label>
+      <label>Name<input type="text" name="name" placeholder="Unnamed"></label>
+      <div class="row">
+        <label>Shift start<input type="number" name="start" value="8" min="0" max="23"></label>
+        <label>Shift end<input type="number" name="end" value="16" min="0" max="23"></label>
+      </div>
+      <button type="submit">Hire</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Buy food</h2>
+    <form data-endpoint="/api/food">
+      <label>Food
+        <select name="food">
+          <option value="meat">Meat</option>
+          <option value="hay">Hay</option>
+          <option value="fish">Fish</option>
+        </select>
+      </label>
+      <label>Weight (kg)<input type="number" name="weight" value="10" min="1"></label>
+      <button type="submit">Buy</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Buy medicine</h2>
+    <form data-endpoint="/api/medicine">
+      <label>Quantity of Antibiotic<input type="number" name="quantity" value="1" min="1"></label>
+      <button type="submit">Buy</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Heal animal</h2>
+    <form data-endpoint="/api/heal">
+      <label>Sick animal
+        <select name="animal_id" id="sick-animal-select">
+          <option value="" disabled selected>No sick animals</option>
+        </select>
+      </label>
+      <button type="submit">Heal</button>
+      <p class="msg"></p>
+    </form>
+  </section>
+</main>
+
+<script>
+const POLL_MS = 2000;
+
+function fmtPct(x) { return x.toFixed(0) + "%"; }
+
+function render(state) {
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><span class="label">Day</span><span class="value">${state.day}</span></div>
+    <div class="stat"><span class="label">Hour</span><span class="value">${state.hour}:00</span></div>
+    <div class="stat"><span class="label">Budget</span><span class="value">${state.budget}</span></div>
+    <div class="stat"><span class="label">Visitors</span><span class="value">${state.visitors}</span></div>
+    <div class="stat"><span class="label">Score</span><span class="value">${state.score}</span></div>
+  `;
+
+  const animalsBody = document.querySelector("#animals-table tbody");
+  animalsBody.innerHTML = state.animals.length ? state.animals.map(a => `
+    <tr class="${a.is_sick ? 'sick' : ''}">
+      <td>${a.name}</td>
+      <td>${a.species}</td>
+      <td>${fmtPct(a.health * 100)}</td>
+      <td>${fmtPct(a.hunger)}</td>
+      <td>${a.is_sick ? "sick" : (a.awake ? "awake" : "asleep")}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="5" class="empty">No animals yet.</td></tr>`;
+
+  const staffBody = document.querySelector("#staff-table tbody");
+  staffBody.innerHTML = state.staff.length ? state.staff.map(e => `
+    <tr><td>${e.name}</td><td>${e.type}</td><td>${e.status}</td></tr>
+  `).join("") : `<tr><td colspan="3" class="empty">No staff yet.</td></tr>`;
+
+  const enclosuresBody = document.querySelector("#enclosures-table tbody");
+  enclosuresBody.innerHTML = state.enclosures.length ? state.enclosures.map(e => `
+    <tr>
+      <td>#${e.number}</td>
+      <td>${e.diet}</td>
+      <td>${fmtPct(e.cleanliness * 100)}</td>
+      <td>${e.occupied}/${e.capacity}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="4" class="empty">No enclosures yet.</td></tr>`;
+
+  const foodBody = document.querySelector("#food-table tbody");
+  foodBody.innerHTML = state.food.length ? state.food.map(f => `
+    <tr><td>${f.name}</td><td>${f.weight}</td><td>Day ${f.best_before}</td></tr>
+  `).join("") : `<tr><td colspan="3" class="empty">No food in stock.</td></tr>`;
+  document.getElementById("medicine-count").textContent = state.medicine_count;
+  document.getElementById("egg-count").textContent = state.eggs;
+
+  const sickSelect = document.getElementById("sick-animal-select");
+  const sickAnimals = state.animals.filter(a => a.is_sick);
+  const previousValue = sickSelect.value;
+  sickSelect.innerHTML = sickAnimals.length
+    ? sickAnimals.map(a => `<option value="${a.id}">${a.name} (${a.species})</option>`).join("")
+    : `<option value="" disabled selected>No sick animals</option>`;
+  if (sickAnimals.some(a => a.id === previousValue)) sickSelect.value = previousValue;
+}
+
+async function refresh() {
+  const response = await fetch("/api/status");
+  render(await response.json());
+}
+
+function formToPayload(form) {
+  const payload = {};
+  for (const element of form.elements) {
+    if (element.name) payload[element.name] = element.value;
+  }
+  return payload;
+}
+
+document.querySelectorAll("form").forEach(form => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const msg = form.querySelector(".msg");
+    const endpoint = form.dataset.endpoint;
+    const body = form.dataset.emptyBody ? {} : formToPayload(form);
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      msg.textContent = data.error || "Something went wrong.";
+      msg.className = "msg error";
+      return;
+    }
+    msg.textContent = "Done.";
+    msg.className = "msg ok";
+    render(data);
+    setTimeout(() => { msg.textContent = ""; }, 2000);
+  });
+});
+
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+
+</body>
+</html>
