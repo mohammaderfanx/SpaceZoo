@@ -1,51 +1,76 @@
--- SpaceZoo Datenbank-Schema (SQLite-kompatibel)
+-- DinoZoo / SpaceZoo savegame schema.
+-- Persists the state of backend.core.simulationEngine.SimulationEngine /
+-- backend.core.zoo.Zoo so a session can be restored on the next launch.
 
--- 1. Tabelle für den generellen Zoo-Status (Geld, Zeit, Tag/Nacht-Zyklus, Spielerposition)
+-- 1. Singleton row for zoo-wide state (budget, simulation clock, environment, score).
 CREATE TABLE IF NOT EXISTS zoo_status (
-    id INTEGER PRIMARY KEY CHECK (id = 1), -- Erzwingt eine Singleton-Zeile für den aktuellen Spielstand
-    money INTEGER NOT NULL DEFAULT 100,
-    simulation_time REAL NOT NULL DEFAULT 0.0, -- Gesamtzeit in Sekunden
-    is_night BOOLEAN NOT NULL DEFAULT 0,
-    player_x INTEGER NOT NULL DEFAULT 10,
-    player_y INTEGER NOT NULL DEFAULT 8,
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    has_save BOOLEAN NOT NULL DEFAULT 0,
+    budget INTEGER NOT NULL DEFAULT 100,
+    elapsed_days INTEGER NOT NULL DEFAULT 0,
+    elapsed_hours INTEGER NOT NULL DEFAULT 0,
+    visitors INTEGER NOT NULL DEFAULT 0,
+    score REAL NOT NULL DEFAULT 0.0,
+    weather TEXT NOT NULL DEFAULT 'SUNNY',
+    temperature INTEGER NOT NULL DEFAULT 25,
+    wind_speed INTEGER NOT NULL DEFAULT 40,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Tabelle für das Inventar / Futter- und Item-Bestand
-CREATE TABLE IF NOT EXISTS inventory (
-    item_id TEXT PRIMARY KEY, -- z.B. 'futter_birdy', 'futter_liz', 'medizin'
-    item_name TEXT NOT NULL,
-    quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- 2. Enclosures (number matches backend.zooManagement.enclosure.Enclosure.number).
+CREATE TABLE IF NOT EXISTS enclosures (
+    number INTEGER PRIMARY KEY,
+    capacity INTEGER NOT NULL,
+    diet TEXT NOT NULL,                 -- 'carnivore' | 'herbivore' | 'omnivore'
+    cleanliness REAL NOT NULL DEFAULT 1.0
 );
 
--- 3. Tabelle für gekaufte Tiere (inkl. Lebenszyklus, Hunger und Gesundheitsstatus)
-CREATE TABLE IF NOT EXISTS creatures (
+-- 3. Animals (one row per backend.animalSimulation.animal.Animal instance).
+CREATE TABLE IF NOT EXISTS animals (
     id TEXT PRIMARY KEY,
-    species TEXT NOT NULL, -- 'Birdy', 'Liz', 'Mal', 'Pinky', 'Rizzy', 'Sami'
+    species TEXT NOT NULL,              -- 'Eagle' | 'Wolf' | 'Rabbit'
     name TEXT NOT NULL,
-    age_seconds REAL NOT NULL DEFAULT 0.0, -- Lebenszyklus: 0-300s Kind, 300-600s Erwachsen, 600-900s Alt
-    hunger REAL NOT NULL DEFAULT 0.0 CHECK (hunger >= 0.0 AND hunger <= 100.0),
-    hunger_timer REAL NOT NULL DEFAULT 10.0, -- 10s Countdown bei 100% Hunger bis zum Tod
-    is_sick BOOLEAN NOT NULL DEFAULT 0,
-    sick_timer REAL NOT NULL DEFAULT 15.0, -- 15s Countdown bei Krankheit bis zum Tod
-    pos_x INTEGER NOT NULL,
-    pos_y INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    birthdate INTEGER NOT NULL,
+    gender TEXT NOT NULL,               -- 'male' | 'female'
+    health REAL NOT NULL DEFAULT 1.0,
+    saturation REAL NOT NULL DEFAULT 1.0,
+    energy REAL NOT NULL DEFAULT 1.0,
+    awake BOOLEAN NOT NULL DEFAULT 1,
+    illness_name TEXT,
+    enclosure_number INTEGER REFERENCES enclosures(number)
 );
 
--- 4. Tabelle für das aktive Personal (Caretaker, Vet, Cashier)
+-- 4. Staff (Caretaker, Vet, Cashier).
 CREATE TABLE IF NOT EXISTS staff (
     id TEXT PRIMARY KEY,
-    staff_type TEXT NOT NULL, -- 'Caretaker', 'Vet', 'Cashier'
+    type TEXT NOT NULL,                 -- 'Caretaker' | 'Vet' | 'Cashier'
     name TEXT NOT NULL,
-    salary INTEGER NOT NULL DEFAULT 10, -- 10$ Personalkosten
-    status TEXT NOT NULL DEFAULT 'Idle', -- 'Idle', 'Working'
-    pos_x INTEGER NOT NULL,
-    pos_y INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    shift_start INTEGER NOT NULL,
+    shift_end INTEGER NOT NULL,
+    salary INTEGER NOT NULL DEFAULT 10,
+    busy_for INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'Idle'
 );
 
--- Initialer Zoo-Status-Eintrag (Standardwerte)
-INSERT OR IGNORE INTO zoo_status (id, money, simulation_time, is_night, player_x, player_y)
-VALUES (1, 100, 0.0, 0, 10, 8);
+-- 5. Food stock (backend.zooManagement.food.FoodItem instances).
+CREATE TABLE IF NOT EXISTS food_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    food_type TEXT NOT NULL,            -- 'Meat' | 'Hay' | 'Fish'
+    weight INTEGER NOT NULL,
+    best_before INTEGER NOT NULL
+);
+
+-- 6. Medicine stock, grouped by type since individual units are interchangeable.
+CREATE TABLE IF NOT EXISTS medicine_items (
+    medicine_type TEXT PRIMARY KEY,     -- 'Antibiotic'
+    quantity INTEGER NOT NULL DEFAULT 0
+);
+
+-- 7. Unhatched eggs.
+CREATE TABLE IF NOT EXISTS eggs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    species TEXT NOT NULL,
+    day_of_hatching INTEGER NOT NULL
+);
+
+INSERT OR IGNORE INTO zoo_status (id) VALUES (1);

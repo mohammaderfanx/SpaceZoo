@@ -13,10 +13,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from backend.core.simulationEngine import SimulationEngine
 from backend.animalSimulation.animal import Eagle, Wolf, Rabbit, Gender
+from backend.animalSimulation.egg import Egg
 from backend.animalSimulation.habits import FoodPreference
+from backend.animalSimulation.illness import Illness, ExampleIllness
 from backend.zooManagement.employee import Caretaker, Vet, Cashier, WorkingHours
 from backend.zooManagement.enclosure import Enclosure
-from backend.zooManagement.food import Meat, Hay, Fish
+from backend.zooManagement.food import Meat, Hay, Fish, FoodItem
 from backend.zooManagement.medicine import Antibiotic
 from database.db_manager import DatabaseManager
 
@@ -46,12 +48,23 @@ class SpaceZooAPI:
         "Antibiotic": Antibiotic,
     }
 
+    DIET_MAP = {
+        "carnivore": FoodPreference.CARNIVORE,
+        "herbivore": FoodPreference.HERBIVORE,
+        "omnivore": FoodPreference.OMNIVORE,
+    }
+
     def __init__(self) -> None:
         self.db = DatabaseManager()
         self.sim = SimulationEngine()
         self.tick_accumulator = 0.0
         self.player_position = (10, 8)
-        self._initialize_demo_zoo()
+
+        saved_state = self.db.load_full_state()
+        if saved_state is not None:
+            self._load_from_save(saved_state)
+        else:
+            self._initialize_demo_zoo()
 
     def _initialize_demo_zoo(self) -> None:
         # Create enclosures for different diet groups
@@ -93,6 +106,149 @@ class SpaceZooAPI:
         # Prime the score from environment and enclosures
         self.sim.zoo.score = self.sim.calculateVisitorScore()
 
+    def _load_from_save(self, data: Dict[str, Any]) -> None:
+        """Rebuilds the zoo/simulation state from a DatabaseManager.load_full_state() dict."""
+        zoo = self.sim.zoo
+        zoo.budget = data["budget"]
+        self.sim.elapsedDays = data["elapsed_days"]
+        self.sim.elapsedHours = data["elapsed_hours"]
+        zoo.visitors = data["visitors"]
+        zoo.score = data["score"]
+        zoo.environment.temperature = data["temperature"]
+        zoo.environment.windSpeed = data["wind_speed"]
+        zoo.environment.weather = zoo.environment.weather.__class__[data["weather"]]
+
+        enclosure_by_number: Dict[int, Enclosure] = {}
+        for row in sorted(data["enclosures"], key=lambda e: e["number"]):
+            enclosure = Enclosure(row["capacity"], self.DIET_MAP[row["diet"]])
+            enclosure.number = row["number"]  # Enclosure() auto-assigns via a process-wide counter; force it back to the saved number
+            enclosure.cleanliness = row["cleanliness"]
+            enclosure_by_number[row["number"]] = enclosure
+        zoo.enclosures = list(enclosure_by_number.values())
+
+        for row in data["animals"]:
+            animal_cls = self.SPECIES_MAP[row["species"]]
+            animal = animal_cls(row["name"], row["birthdate"], Gender(row["gender"]))
+            animal.id = row["id"]
+            animal.health = row["health"]
+            animal.saturation = row["saturation"]
+            animal.energy = row["energy"]
+            animal.awake = row["awake"]
+            animal.illness = self._illness_from_name(row["illness_name"])
+            zoo.animals.append(animal)
+            enclosure = enclosure_by_number.get(row["enclosure_number"])
+            if enclosure is not None:
+                enclosure.animals.append(animal)
+
+        for row in data["staff"]:
+            staff_cls = self.STAFF_MAP[row["type"]]
+            employee = staff_cls(row["name"], WorkingHours(row["shift_start"], row["shift_end"]))
+            employee.id = row["id"]
+            employee.salary = row["salary"]
+            employee.busyFor = row["busy_for"]
+            employee.status = row["status"]
+            zoo.staff.append(employee)
+
+        for row in data["food_items"]:
+            food_cls = self.FOOD_MAP[row["food_type"]]
+            food_item = FoodItem(food_cls(), row["weight"], 0)
+            food_item.bestBefore = row["best_before"]
+            zoo.inventory.food.append(food_item)
+
+        for row in data["medicine_items"]:
+            med_cls = self.MEDICINE_MAP[row["medicine_type"]]
+            zoo.inventory.medicine.extend(med_cls() for _ in range(row["quantity"]))
+
+        for row in data["eggs"]:
+            species_cls = self.SPECIES_MAP[row["species"]]
+            egg = Egg(species_cls, 0)
+            egg.dayOfHatching = row["day_of_hatching"]
+            zoo.eggs.append(egg)
+
+    def _illness_from_name(self, name: Optional[str]) -> Optional[Illness]:
+        if name is None:
+            return None
+        if name == ExampleIllness().name:
+            return ExampleIllness()
+        return Illness(name, 0.2, 0.07)
+
+    def _serialize_state_for_save(self) -> Dict[str, Any]:
+        """Builds the dict DatabaseManager.save_full_state() expects from the live zoo state."""
+        zoo = self.sim.zoo
+        enclosure_number_by_animal = {
+            animal.id: enclosure.number
+            for enclosure in zoo.enclosures
+            for animal in enclosure.animals
+        }
+        medicine_counts: Dict[str, int] = {}
+        for medicine in zoo.inventory.medicine:
+            medicine_counts[medicine.name] = medicine_counts.get(medicine.name, 0) + 1
+
+        return {
+            "budget": int(zoo.budget),
+            "elapsed_days": self.sim.elapsedDays,
+            "elapsed_hours": self.sim.elapsedHours,
+            "visitors": int(zoo.visitors),
+            "score": float(zoo.score),
+            "weather": zoo.environment.weather.name,
+            "temperature": int(zoo.environment.temperature),
+            "wind_speed": int(zoo.environment.windSpeed),
+            "enclosures": [
+                {
+                    "number": enclosure.number,
+                    "capacity": enclosure.capacity,
+                    "diet": enclosure.typeOfAnimal.value,
+                    "cleanliness": float(enclosure.cleanliness),
+                }
+                for enclosure in zoo.enclosures
+            ],
+            "animals": [
+                {
+                    "id": animal.id,
+                    "species": animal.species,
+                    "name": animal.name,
+                    "birthdate": animal.birthdate,
+                    "gender": animal.gender.value,
+                    "health": float(animal.health),
+                    "saturation": float(animal.saturation),
+                    "energy": float(animal.energy),
+                    "awake": bool(animal.awake),
+                    "illness_name": animal.illness.name if animal.illness is not None else None,
+                    "enclosure_number": enclosure_number_by_animal.get(animal.id),
+                }
+                for animal in zoo.animals
+            ],
+            "staff": [
+                {
+                    "id": member.id,
+                    "type": member.__class__.__name__,
+                    "name": member.name,
+                    "shift_start": member.workingHours.startOfShift,
+                    "shift_end": member.workingHours.endOfShift,
+                    "salary": member.salary,
+                    "busy_for": member.busyFor,
+                    "status": member.status,
+                }
+                for member in zoo.staff
+            ],
+            "food_items": [
+                {"food_type": item.type.name, "weight": item.weight, "best_before": item.bestBefore}
+                for item in zoo.inventory.food
+            ],
+            "medicine_items": [
+                {"medicine_type": name, "quantity": quantity}
+                for name, quantity in medicine_counts.items()
+            ],
+            "eggs": [
+                {"species": egg.species.__name__, "day_of_hatching": egg.dayOfHatching}
+                for egg in zoo.eggs
+            ],
+        }
+
+    def save_game(self) -> None:
+        """Persists the current zoo state to the database."""
+        self.db.save_full_state(self._serialize_state_for_save())
+
     def _normalize_animal_positions(self) -> None:
         for index, animal in enumerate(self.sim.zoo.animals):
             if animal.x == 0 and animal.y == 0:
@@ -122,6 +278,8 @@ class SpaceZooAPI:
             self.sim.tick_once()
             self.tick_accumulator -= self.sim.secondsPerTick
             ticks_executed += 1
+        if ticks_executed > 0:
+            self.save_game()
         return {
             "success": True,
             "ticks_executed": ticks_executed,
@@ -139,6 +297,7 @@ class SpaceZooAPI:
             always advances simulation by one tick
         """
         self.sim.tick_once()
+        self.save_game()
         return {
             "success": True,
             "elapsed_days": self.sim.elapsedDays,

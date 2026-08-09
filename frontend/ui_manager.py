@@ -173,8 +173,11 @@ class UIManager:
     def _api_action(self, callback: Callable[[SpaceZooAPI], Dict[str, Any]]) -> Dict[str, Any]:
         try:
             result = callback(self._api_reference)
+            success = result.get("success", False)
+            if success:
+                self._api_reference.save_game()
             return {
-                "success": result.get("success", False),
+                "success": success,
                 "message": result.get("message", "Action completed."),
             }
         except Exception as exc:
