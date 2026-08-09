@@ -25,6 +25,7 @@ class SimulationEngine:
         self.elapsedHours = 0
         self.elapsedDays = 0
         self.running = False
+        self.lock = threading.RLock()
 
 
     def tick(self):
@@ -36,8 +37,10 @@ class SimulationEngine:
         Tests:
             called once -> elapsed time advances and all periodic effects apply, and the next tick is scheduled
         """
-        self._process_tick()
-        threading.Timer(self.secondsPerTick, self.tick).start()
+        with self.lock:
+            self._process_tick()
+        if self.running:
+            threading.Timer(self.secondsPerTick, self.tick).start()
 
     def tick_once(self) -> None:
         """Advances the simulation by one discrete tick without scheduling a timer.
@@ -48,7 +51,8 @@ class SimulationEngine:
         Tests:
             called once -> elapsed time advances and all periodic effects apply
         """
-        self._process_tick()
+        with self.lock:
+            self._process_tick()
 
     def _process_tick(self) -> None:
         """Processes a single simulation tick."""
@@ -61,6 +65,7 @@ class SimulationEngine:
         self.eggsHatch()
         self.catchIllnesses()
         self.cleanEnclosures()
+        self.decreaseBusyFor()
         self.zoo.score = self.calculateVisitorScore()
         self.ticks += 1
 
@@ -257,6 +262,22 @@ class SimulationEngine:
         
 
 
+    def decreaseBusyFor(self):
+        """Reduces staff's remaining busy time by one tick, freeing them up again once it hits 0.
+
+        Args:
+            self
+
+        Return:
+            None
+
+        Tests:
+            employee is busy -> busyFor decreases by 1
+            employee already free -> busyFor stays at 0
+        """
+        for employee in self.zoo.staff:
+            employee.busyFor = max(0, employee.busyFor - 1)
+
     def calculateVisitorScore(self):
         """Computes the visitor score from environment, animal count, and enclosure cleanliness.
 
@@ -298,3 +319,17 @@ class SimulationEngine:
             return
         self.running = True
         self.tick()
+
+    def stop(self):
+        """Stops the recurring simulation loop started by start().
+
+        Args:
+            self
+
+        Return:
+            None
+
+        Tests:
+            called while running -> the next scheduled tick() no longer reschedules itself
+        """
+        self.running = False
