@@ -5,9 +5,9 @@ version: 1
 """
 
 from typing import List
-from zooManagement.food import FoodItem, Food
-from zooManagement.medicine import Medicine
-from animalSimulation.illness import Illness
+from backend.zooManagement.food import FoodItem, Food
+from backend.zooManagement.medicine import Medicine
+from backend.animalSimulation.illness import Illness
 
 class Inventory:
     """Tracks the zoo's stock of food and medicine."""
@@ -47,5 +47,5 @@ class Inventory:
             multiple matching items -> returns them sorted by bestBefore ascending
             no matching items -> returns an empty list
         """
-        listOfFood = [food for food in self.food if type[self.food] == category]
-        return listOfFood.sort(lambda food: food.bestBefore)
+        listOfFood = [food for food in self.food if isinstance(food.type, category)]
+        return sorted(listOfFood, key=lambda food: food.bestBefore)

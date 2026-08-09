@@ -4,7 +4,7 @@ date: 08.08.2026
 version: 1
 """
 
-from core.simulationEngine import SimulationEngine
+from backend.core.simulationEngine import SimulationEngine
 
 def main():
     simulationEngine = SimulationEngine()

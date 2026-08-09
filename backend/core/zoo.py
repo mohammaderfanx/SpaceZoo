@@ -8,14 +8,14 @@ version: 1
 from typing import List
 import statistics
 
-from animalSimulation.animal import Animal, Gender
-from zooManagement.employee import Employee, Caretaker, Vet, Cashier, WorkingHours
-from zooManagement.inventory import Inventory
-from zooManagement.enclosure import Enclosure
-from zooManagement.food import Food, FoodItem
-from zooManagement.medicine import Medicine
-from animalSimulation.egg import Egg
-from animalSimulation.environmentalFactors import EnvironmentalFactors
+from backend.animalSimulation.animal import Animal, Gender
+from backend.zooManagement.employee import Employee, Caretaker, Vet, Cashier, WorkingHours
+from backend.zooManagement.inventory import Inventory
+from backend.zooManagement.enclosure import Enclosure
+from backend.zooManagement.food import Food, FoodItem
+from backend.zooManagement.medicine import Medicine
+from backend.animalSimulation.egg import Egg
+from backend.animalSimulation.environmentalFactors import EnvironmentalFactors
 
 class Zoo:
     """Central aggregate holding the zoo's animals, staff, enclosures, inventory, and budget, as well as environmental factors and the current visitor score."""
@@ -45,7 +45,7 @@ class Zoo:
                 matching employees on shift and free -> included in result
                 matching employees off shift or busy -> excluded from result
             """
-            return [employee for employee in self.staff if type[employee] == typeOfEmployee and employee.isOnShift() and employee.busyFor == 0]
+            return [employee for employee in self.staff if isinstance(employee, typeOfEmployee) and employee.isOnShift() and employee.busyFor == 0]
 
     def getCaretakers(self) -> List[Caretaker]:
         """Returns all available caretakers.
@@ -201,21 +201,28 @@ class Zoo:
               self.inventory.medicine.append(medicine)
 
     def healAnimal(self, animal: Animal):
-        """Heals the given animal using an available vet if matching medicine is in stock.
+        """Heals the given animal by consuming matching medicine from inventory.
 
         Args:
-            self
             animal: the animal to heal
 
+        Returns:
+            bool: True if the animal was healed, False otherwise.
+
         Tests:
-            animal has no illness -> method returns immediately, no vet used
-            matching medicine in stock and vet available -> animal gets healed and medicine is consumed
-            illness present but no matching medicine -> animal remains unhealed
+            animal has no illness -> returns False and inventory is unchanged
+            matching medicine in stock -> illness is removed and medicine consumed
+            no matching medicine in stock -> returns False
         """
-        if animal.illness == None:
-          return
-        if self.inventory.checkForMedicineForSpecificIllness(animal.illness):
-            availableVets = self.getVets()
-            availableVets[0].healAnimal(animal)
-            self.inventory.medicine.remove(medicine for medicine in self.inventory.medicine if type[medicine.illness] == type[animal.illness])
+        if animal.illness is None:
+            return False
+
+        matching_medicine = [med for med in self.inventory.medicine if type(med.illness) == type(animal.illness)]
+        if not matching_medicine:
+            return False
+
+        self.inventory.medicine.remove(matching_medicine[0])
+        animal.illness = None
+        animal.health = min(1.0, animal.health + 0.3)
+        return True
        

@@ -6,9 +6,9 @@ version: 1
 
 import random
 from enum import Enum
-from animalSimulation.illness import Illness
-from animalSimulation.lifecycle import Lifecycle, LifecyclePhase
-from animalSimulation.habits import Habits, SleepingHabit, EatingHabit, FoodPreference
+from backend.animalSimulation.illness import Illness
+from backend.animalSimulation.lifecycle import Lifecycle, LifecyclePhase
+from backend.animalSimulation.habits import Habits, SleepingHabit, EatingHabit, FoodPreference
 
 class Gender(Enum):
     """Biological sex of an animal."""
@@ -20,7 +20,9 @@ class Animal:
     """Base class for a zoo animal, tracking identity, lifecycle, health, and habits."""
 
     def __init__(self, name: str, birthdate: int, gender: Gender):
+            self.id = name
             self.name = name
+            self.species = self.__class__.__name__
             self.birthdate = birthdate
             self.gender = gender
             self.saturation = 1
@@ -31,6 +33,32 @@ class Animal:
             self.habits: Habits
             self.awake: bool = True
             self.price: int
+            self.x: int = 0
+            self.y: int = 0
+
+    def get_age_days(self, elapsedDays: int) -> int:
+        """Returns the animal's age in days relative to the current simulation day."""
+        return max(0, elapsedDays - self.birthdate)
+
+    def get_hunger_percent(self) -> float:
+        """Returns the animal's hunger percentage based on saturation."""
+        return max(0.0, min(100.0, 100.0 * (1.0 - self.saturation)))
+
+    def to_dict(self, elapsedDays: int) -> dict:
+        """Serializes the animal state to a dictionary for UI and persistence."""
+        return {
+            "id": self.id,
+            "species": self.species,
+            "name": self.name,
+            "age_days": self.get_age_days(elapsedDays),
+            "health": float(self.health),
+            "hunger": float(self.get_hunger_percent()),
+            "energy": float(self.energy),
+            "is_sick": self.illness is not None,
+            "awake": self.awake,
+            "position": (self.x, self.y),
+            "gender": self.gender.value,
+        }
 
     def getLifecyclePhase(self, elapsedDays):
         """Returns the animal's current lifecycle phase based on its age.

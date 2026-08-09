@@ -5,7 +5,7 @@ version: 1
 """
 
 from datetime import date, timedelta
-from animalSimulation.illness import Illness
+from backend.animalSimulation.illness import ExampleIllness, Illness
 from typing import List
 
 
@@ -18,11 +18,12 @@ class Medicine:
         self.price = price
         self.illness = illness
 
-class ExampleMedicine:
-    """Sample Medicine preset used for testing/demo purposes."""
+
+class Antibiotic(Medicine):
+    """Antibiotic medicine used to treat generic infections."""
 
     def __init__(self):
-        super().__init__("Medicine against ExampleIllness", 30, 12, ExampleMedicine)
+        super().__init__("Antibiotic", 30, 12, ExampleIllness())
 
 
 class MedicineItem:
@@ -31,6 +32,6 @@ class MedicineItem:
     def __init__(self, type: Medicine, weight: int):
         self.type = type
         self.weight = weight
-        self.bestBefore = date.today() + timedelta(days = self.type.shelfLife)
+        self.bestBefore = date.today() + timedelta(days=self.type.shelfLife)
 
 

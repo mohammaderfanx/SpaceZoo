@@ -4,35 +4,41 @@ date: 08.08.2026
 version: 1
 """
 
-from animalSimulation.animal import Animal
-from enclosure import Enclosure
+from abc import ABC, abstractmethod
+
+from backend.animalSimulation.animal import Animal
+from backend.zooManagement.enclosure import Enclosure
+
 
 class WorkingHours:
-    """Start and end hour of an employee's daily shift."""
+    """Represents an employee's daily shift start and end hours."""
 
     def __init__(self, startOfShift: int, endOfShift: int):
         self.startOfShift = startOfShift
         self.endOfShift = endOfShift
 
 
-class Employee:
-    """Base class for zoo staff, tracking identity, shift, and busy state."""
+class Employee(ABC):
+    """Abstract base class for zoo staff with shared identity and shift behavior."""
 
-    def __init__(self, name: str, workingHours: WorkingHours, salary: int = 10):
+    def __init__(self, name: str, workingHours: WorkingHours, salary: int = 10, x: int = 0, y: int = 0):
+        self.id = name
         self.name = name
         self.workingHours = workingHours
-        self.salary = salary 
+        self.salary = salary
         self.busyFor: int = 0
+        self.x: int = x
+        self.y: int = y
+        self.status: str = "Idle"
 
-    def isOnShift(self, elapsedHours: int):
-        """Returns whether the employee is working at the given hour.
+    def isOnShift(self, elapsedHours: int | None = None) -> bool:
+        """Returns whether the employee is on shift at the specified hour.
 
         Args:
-            self
-            elapsedHours: current hour of the simulation day
+            elapsedHours: Optional current hour of the simulation day.
 
         Returns:
-            bool: True if elapsedHours falls within the employee's shift
+            bool: True when the employee is working.
 
         Tests:
             shift does not cross midnight, hour inside range -> returns True
@@ -40,59 +46,69 @@ class Employee:
             shift crosses midnight, hour inside wrapped range -> returns True
             shift crosses midnight, hour outside wrapped range -> returns False
         """
+        if elapsedHours is None:
+            return True
         if self.workingHours.startOfShift < self.workingHours.endOfShift:
-            if elapsedHours >= self.workingHours.startOfShift and elapsedHours < self.workingHours.endOfShift:
-                return True
-            else:
-                return False
-        else:
-            if elapsedHours >= self.workingHours.startOfShift or elapsedHours < self.workingHours.endOfShift:
-                return True
-            else:
-                return False
-        
-    
-    
-class Caretaker(Employee):
-    """Employee responsible for feeding and cleaning up after animals."""
+            return self.workingHours.startOfShift <= elapsedHours < self.workingHours.endOfShift
+        return elapsedHours >= self.workingHours.startOfShift or elapsedHours < self.workingHours.endOfShift
 
-    def __init__(self, name: str, workingHours: WorkingHours):
-        super().__init__(name, workingHours, salary = 10)
+    def to_dict(self) -> dict:
+        """Serializes the employee state into a dictionary for UI consumption.
 
-    def feedAnimal(self, animal: Animal, percentHungerQuelled: float):
-        """Feeds the given animal by the specified hunger-quelled percentage and is busy for one additional hour.
-
-        Args:
-            self
-            animal: the animal to feed
-            percentHungerQuelled: fraction of the animal's hunger that gets satisfied
-        
         Returns:
-            None
+            dict: Employee state with ID, name, type, status, salary, and position.
 
         Tests:
-            called if caretaker isn't busy -> delegates to animal.feed(percentHungerQuelled), caretaker becomes busy
-            called if caretaker busy -> becomes busy for an additional hour, animal is fed anyway
+            employee with position -> dictionary includes position tuple
+            employee salary set -> dictionary records salary
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.__class__.__name__,
+            "status": self.status,
+            "salary": self.salary,
+            "position": (self.x, self.y),
+        }
+
+    @abstractmethod
+    def performDuty(self, target: object) -> None:
+        """Performs a role-specific duty on a target object."""
+        raise NotImplementedError()
+
+
+class Caretaker(Employee):
+    """Employee responsible for feeding and cleaning enclosures."""
+
+    def __init__(self, name: str, workingHours: WorkingHours):
+        super().__init__(name, workingHours, salary=10)
+
+    def feedAnimal(self, animal: Animal, percentHungerQuelled: float) -> None:
+        """Feeds the given animal and marks the caretaker busy.
+
+        Args:
+            animal: the animal to feed
+            percentHungerQuelled: fraction of hunger satisfied
+
+        Tests:
+            healthy animal receives feed -> saturation increases
+            busy caretaker still performs duty and busyFor increments
         """
         animal.feed(percentHungerQuelled)
-        busyFor += 1
+        self.busyFor += 1
 
-    def cleanEnclosure(self, enclosure: Enclosure):
-        """Cleans enclosure and is busy for one additional hour.
-        
-            Args:
-                self
-                enclosure: Enclosure to clean
-            
-            Returns: 
-                None
-        
-            Tests:
-                called if caretaker isn't busy -> delegates to enclosure.getCleaned(), caretaker becomes busy
-                called if caretaker busy -> checked before, doesn't happen
-            """
+    def cleanEnclosure(self, enclosure: Enclosure) -> None:
+        """Cleans the enclosure and marks the caretaker busy."""
         enclosure.getCleaned()
         self.busyFor += 1
+
+    def performDuty(self, target: object) -> None:
+        """Performs a duty on an enclosure or animal target."""
+        if isinstance(target, Animal):
+            self.feedAnimal(target, 1.0)
+        elif isinstance(target, Enclosure):
+            self.cleanEnclosure(target)
+
 
 class Vet(Employee):
     """Employee responsible for healing sick animals."""
@@ -116,6 +132,10 @@ class Vet(Employee):
         """
         self.busyFor += 1
 
+    def performDuty(self, target: object) -> None:
+        """Perform a vet duty on a sick animal target."""
+        if isinstance(target, Animal):
+            self.healAnimal(target)
 
 
 class Cashier(Employee):
@@ -136,4 +156,7 @@ class Cashier(Employee):
         """
         self.busyFor += 1
 
+    def performDuty(self, target: object) -> None:
+        """Perform cashier duty by selling a ticket."""
+        self.sellTicket()
 

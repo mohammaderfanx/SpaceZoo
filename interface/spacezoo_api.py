@@ -1,588 +1,433 @@
 """
-Fassade (Facade-Pattern) für die SpaceZoo API.
-Dient als einziger Schnittstellen- und Kommunikationskanal zwischen Frontend (Pygame) und Backend/Database.
+Facade layer for SpaceZoo.
 
-Gemäß ARCHITECTURE.md:
-- Das Frontend (frontend/) darf NIEMALS direkt Klassen aus backend/ oder database/ importieren.
-- Die gesamte Kommunikation erfolgt über SpaceZooAPI.
-- Alle Rückgabewerte und Parameter bestehen ausschließlich aus Python-Basisdatentypen (dict, list, int, float, str, bool, tuple).
+This class provides the only bridge between frontend and backend logic.
+It exposes native Python data structures only and hides backend implementation
+details behind a simple UI-friendly API.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
-import uuid
+from __future__ import annotations
 
-# Backend / Database imports
+import random
+from typing import Any, Dict, List, Optional, Tuple
+
+from backend.core.simulationEngine import SimulationEngine
+from backend.animalSimulation.animal import Eagle, Wolf, Rabbit, Gender
+from backend.animalSimulation.habits import FoodPreference
+from backend.zooManagement.employee import Caretaker, Vet, Cashier, WorkingHours
+from backend.zooManagement.enclosure import Enclosure
+from backend.zooManagement.food import Meat, Hay, Fish
+from backend.zooManagement.medicine import Antibiotic
 from database.db_manager import DatabaseManager
-from backend.simulation_engine_old import SimulationEngine
-from backend.animal_old import Animal
-from backend.staff import Caretaker, Vet, Cashier
 
 
 class SpaceZooAPI:
-    """
-    Fassaden-Klasse zur Steuerung und Abfrage der Zoo-Simulation.
-    Kapselt die Domänenlogik und Datenbankzugriffe und stellt entkoppelte
-    Methoden für das Frontend bereit.
-    """
+    """Facade for the SpaceZoo game logic exposed to the frontend."""
+
+    SPECIES_MAP = {
+        "Eagle": Eagle,
+        "Wolf": Wolf,
+        "Rabbit": Rabbit,
+    }
+
+    FOOD_MAP = {
+        "Meat": Meat,
+        "Hay": Hay,
+        "Fish": Fish,
+    }
+
+    STAFF_MAP = {
+        "Caretaker": Caretaker,
+        "Vet": Vet,
+        "Cashier": Cashier,
+    }
+
+    MEDICINE_MAP = {
+        "Antibiotic": Antibiotic,
+    }
 
     def __init__(self) -> None:
-        """
-        Initialisiert die API-Fassade und bereitet die Verbindung zu Backend
-        und Datenbank vor.
-        """
-        # Instanziere DatabaseManager und SimulationEngine
         self.db = DatabaseManager()
         self.sim = SimulationEngine()
+        self.tick_accumulator = 0.0
+        self.player_position = (10, 8)
+        self._initialize_demo_zoo()
 
-        # Lade persistenten Zustand aus der DB in die Simulation (sofern vorhanden)
-        zoo_status = self.db.get_zoo_status()
-        if zoo_status:
-            try:
-                self.sim.money = int(zoo_status.get("money", self.sim.money))
-                self.sim.simulation_time = float(zoo_status.get("simulation_time", self.sim.simulation_time))
-                self.sim.is_night = bool(zoo_status.get("is_night", self.sim.is_night))
-                # Spielerposition
-                px = int(zoo_status.get("player_x", self.sim.player.x))
-                py = int(zoo_status.get("player_y", self.sim.player.y))
-                self.sim.player.x = px
-                self.sim.player.y = py
-            except Exception:
-                # Falls Parsing fehlschlägt, fahren wir mit Default-Werten fort
-                pass
+    def _initialize_demo_zoo(self) -> None:
+        # Create enclosures for different diet groups
+        herbivore_enclosure = Enclosure(6, FoodPreference.HERBIVORE)
+        carnivore_enclosure = Enclosure(4, FoodPreference.CARNIVORE)
+        omnivore_enclosure = Enclosure(5, FoodPreference.OMNIVORE)
 
-        # Lade Tiere + Personal aus DB
-        try:
-            creatures = self.db.get_all_creatures()
-            self.sim.creatures = []
-            for c in creatures:
-                a = Animal(
-                    id_=c["id"],
-                    species=c["species"],
-                    name=c["name"],
-                    pos_x=int(c["pos_x"]),
-                    pos_y=int(c["pos_y"]),
-                    age_seconds=float(c.get("age_seconds", 0.0)),
-                    hunger=float(c.get("hunger", 0.0)),
-                    hunger_timer=float(c.get("hunger_timer", 10.0)),
-                    is_sick=bool(c.get("is_sick", False)),
-                    sick_timer=float(c.get("sick_timer", 15.0)),
-                )
-                self.sim.creatures.append(a)
+        self.sim.zoo.enclosures.extend([
+            herbivore_enclosure,
+            carnivore_enclosure,
+            omnivore_enclosure,
+        ])
 
-            staff_rows = self.db.get_all_staff()
-            self.sim.staff = []
-            for s in staff_rows:
-                stype = s.get("staff_type")
-                if stype == "Caretaker":
-                    member = Caretaker(s["id"], s["name"], int(s.get("pos_x", 10)), int(s.get("pos_y", 8)))
-                elif stype == "Vet":
-                    member = Vet(s["id"], s["name"], int(s.get("pos_x", 10)), int(s.get("pos_y", 8)))
-                elif stype == "Cashier":
-                    member = Cashier(s["id"], s["name"], int(s.get("pos_x", 10)), int(s.get("pos_y", 8)))
-                else:
-                    continue
-                member.status = s.get("status", "Idle")
-                self.sim.staff.append(member)
-        except Exception:
-            # Falls DB-Zugriff fehlschlägt, ignorieren wir beim Start
-            pass
+        # Add demo animals with asset names matching the creature folders
+        demo_animals = [
+            (Rabbit("Birdy", 0, Gender.FEMALE), herbivore_enclosure, (3, 5)),
+            (Rabbit("Liz", 0, Gender.FEMALE), herbivore_enclosure, (5, 7)),
+            (Wolf("Mal", 0, Gender.MALE), carnivore_enclosure, (10, 6)),
+            (Eagle("Pinky", 0, Gender.FEMALE), omnivore_enclosure, (13, 4)),
+            (Eagle("Sami", 0, Gender.MALE), omnivore_enclosure, (15, 5)),
+        ]
+
+        for animal, enclosure, position in demo_animals:
+            animal.x, animal.y = position
+            animal.species = animal.name
+            self.sim.zoo.animals.append(animal)
+            enclosure.animals.append(animal)
+
+        # Add staff for feeding and ticket sales
+        caretaker = Caretaker("Mira", WorkingHours(8, 18))
+        caretaker.x, caretaker.y = 2, 2
+        cashier = Cashier("Noah", WorkingHours(8, 18))
+        cashier.x, cashier.y = 1, 3
+        vet = Vet("Lina", WorkingHours(9, 17))
+        vet.x, vet.y = 3, 2
+
+        self.sim.zoo.staff.extend([caretaker, cashier, vet])
+
+        # Add initial food stock
+        self.sim.zoo.buyFood(Hay, 12, self.sim.elapsedDays)
+        self.sim.zoo.buyFood(Meat, 8, self.sim.elapsedDays)
+        self.sim.zoo.buyFood(Fish, 4, self.sim.elapsedDays)
+
+        # Prime the score from environment and enclosures
+        self.sim.zoo.score = self.sim.calculateVisitorScore()
+
+    def _normalize_animal_positions(self) -> None:
+        for index, animal in enumerate(self.sim.zoo.animals):
+            if animal.x == 0 and animal.y == 0:
+                animal.x = index % 21
+                animal.y = (index // 21) % 16
+
+    def _get_day_phase(self) -> str:
+        hour = self.sim.elapsedHours
+        return "Day" if 6 <= hour < 18 else "Night"
 
     def tick(self, delta_time: float) -> Dict[str, Any]:
+        """Advance the simulation by accumulated real-world seconds.
+
+        Args:
+            delta_time: Real seconds elapsed since the last tick call.
+
+        Returns:
+            dict: Outcome including tick count and current simulation time.
+
+        Tests:
+            delta_time less than tick interval -> returns zero ticks executed
+            delta_time greater than tick interval -> executes one or more ticks
         """
-        Führt einen Simulationsschritt (Tick) aus und aktualisiert den Zoo-Zustand.
+        self.tick_accumulator += delta_time
+        ticks_executed = 0
+        while self.tick_accumulator >= self.sim.secondsPerTick:
+            self.sim.tick_once()
+            self.tick_accumulator -= self.sim.secondsPerTick
+            ticks_executed += 1
+        return {
+            "success": True,
+            "ticks_executed": ticks_executed,
+            "elapsed_days": self.sim.elapsedDays,
+            "elapsed_hours": self.sim.elapsedHours,
+        }
 
-        Berechnet unter anderem:
-        - Altersfortschritt der Tiere (15 min Lebenszyklus: Kind 0-5m, Erwachsen 5-10m, Alt 10-15m)
-        - Kontinuierlich steigenden Hunger (10s Todes-Timer bei 100%)
-        - Zufällige Krankheiten (15s Todes-Timer)
-        - Autonome Aktionen des Personals (Caretaker füttert, Vet heilt, Cashier bedient)
-        - Besucher-Spawns (alle 10s mit 45% Chance), Ticketkauf (15s Wartezeit, 1$ Eintritt),
-          Aufenthalt (max. 10 Besucher zeitgleich im Zoo, Despawn nach 40s)
-        - 2-Minuten Tag/Nacht-Zyklus
+    def advance_tick(self) -> Dict[str, Any]:
+        """Advance the simulation by a single discrete tick.
 
-        :param delta_time: Vergangene Zeit seit dem letzten Tick in Sekunden.
-        :return: Dictionary mit aufgetretenen Ereignissen und Statusänderungen im Tick.
+        Returns:
+            dict: Outcome including the updated simulation time.
+
+        Tests:
+            always advances simulation by one tick
         """
-        result = self.sim.tick(delta_time)
-
-        # Persistiere veränderte Creatures in die DB
-        for creature in self.sim.creatures:
-            try:
-                self.db.update_creature({
-                    "id": creature.id,
-                    "age_seconds": creature.age_seconds,
-                    "hunger": creature.hunger,
-                    "hunger_timer": creature.hunger_timer,
-                    "is_sick": creature.is_sick,
-                    "sick_timer": creature.sick_timer,
-                    "pos_x": creature.x,
-                    "pos_y": creature.y,
-                })
-            except Exception:
-                # Falls Update fehlschlägt, ignoriere es hier
-                pass
-
-        # Persistiere Zoo-Status
-        try:
-            self.db.update_zoo_status(
-                money=self.sim.money,
-                simulation_time=self.sim.simulation_time,
-                is_night=self.sim.is_night,
-                player_x=self.sim.player.x,
-                player_y=self.sim.player.y,
-            )
-        except Exception:
-            pass
-
-        return result
+        self.sim.tick_once()
+        return {
+            "success": True,
+            "elapsed_days": self.sim.elapsedDays,
+            "elapsed_hours": self.sim.elapsedHours,
+        }
 
     def get_zoo_state(self) -> Dict[str, Any]:
-        """
-        Liefert den vollständigen aktuellen Gesamtzustand der Zoo-Simulation.
+        """Return the complete simulation state in plain Python data structures.
 
-        :return: Dictionary mit allen Kern-Informationen:
-                 - 'money': Aktueller Kontostand (int)
-                 - 'time': Simulationszeit & Tagesphase (dict)
-                 - 'player': Spielerposition und Status (dict)
-                 - 'creatures': Liste aller Tiere (List[dict])
-                 - 'visitors': Liste aller Besucher (List[dict])
-                 - 'staff': Liste aller Mitarbeiter (List[dict])
-                 - 'map': Kachelraster & Objekte auf der Map (dict)
-        """
-        # Basisinformationen
-        cycle_progress = self.sim.simulation_time % self.sim.day_duration
-        day_phase = "Nacht" if self.sim.is_night else "Tag"
-        # Zeit bis Ende der aktuellen Phase (Halbzyklus)
-        half = self.sim.day_duration / 2.0
-        if cycle_progress < half:
-            time_remaining = half - cycle_progress
-        else:
-            time_remaining = self.sim.day_duration - cycle_progress
+        Returns:
+            dict: Full zoo state including animals, staff, enclosures, inventory, environment, and map metadata.
 
-        state: Dict[str, Any] = {
-            "money": int(self.sim.money),
+        Tests:
+            returns a dictionary with keys 'animals', 'staff', 'enclosures', and 'environment'
+            animals include age, health, hunger, and position information
+        """
+        self._normalize_animal_positions()
+        animals = []
+        for animal in self.sim.zoo.animals:
+            age_days = animal.get_age_days(self.sim.elapsedDays)
+            animals.append({
+                "id": animal.id,
+                "species": animal.species,
+                "name": animal.name,
+                "age_days": age_days,
+                "age_stage": self._get_age_stage(animal, age_days),
+                "lifespan_days": int(animal.lifecycle.seniorPhase.endOfPhaseAge),
+                "health": float(animal.health),
+                "hunger": float(animal.get_hunger_percent()),
+                "energy": float(animal.energy),
+                "is_sick": animal.illness is not None,
+                "awake": animal.awake,
+                "position": (animal.x, animal.y),
+                "gender": animal.gender.value,
+            })
+
+        staff = [member.to_dict() for member in self.sim.zoo.staff]
+        enclosures = [
+            {
+                "number": enclosure.number,
+                "capacity": enclosure.capacity,
+                "cleanliness": float(enclosure.cleanliness),
+                "animal_count": len(enclosure.animals),
+                "diet": enclosure.typeOfAnimal.value if hasattr(enclosure.typeOfAnimal, "value") else str(enclosure.typeOfAnimal),
+            }
+            for enclosure in self.sim.zoo.enclosures
+        ]
+
+        inventory_items = {}
+        for item in self.sim.zoo.inventory.food:
+            name = item.type.name
+            inventory_items[name] = inventory_items.get(name, 0) + item.weight
+
+        return {
+            "money": int(self.sim.zoo.budget),
             "time": {
-                "simulation_time": float(self.sim.simulation_time),
-                "day_phase": day_phase,
-                "time_remaining": float(time_remaining),
+                "elapsed_days": self.sim.elapsedDays,
+                "elapsed_hours": self.sim.elapsedHours,
+                "day_phase": self._get_day_phase(),
             },
-            "player": self.sim.player.to_dict(),
-            "creatures": [c.to_dict() for c in self.sim.creatures],
-            "visitors": [v.to_dict() for v in self.sim.visitors],
-            "staff": [s.to_dict() for s in self.sim.staff],
+            "score": float(self.sim.zoo.score),
+            "visitors": int(self.sim.zoo.visitors),
+            "animals": animals,
+            "staff": staff,
+            "enclosures": enclosures,
+            "inventory": inventory_items,
+            "environment": {
+                "temperature": int(self.sim.zoo.environment.temperature),
+                "windSpeed": int(self.sim.zoo.environment.windSpeed),
+                "weather": self.sim.zoo.environment.weather.name,
+                "attractiveness": float(self.sim.zoo.environment.getVisitorAttractiveness()),
+            },
+            "player": {
+                "position": self.player_position,
+            },
             "map": {
                 "grid_width": 21,
                 "grid_height": 16,
                 "tile_size": 60,
-                # Minimal: leere Tiles-Map (Frontend kann sie erweitern)
                 "tiles": [[{"type": "floor", "walkable": True} for _ in range(21)] for _ in range(16)],
             },
         }
 
-        return state
+    def get_quick_stats(self) -> Dict[str, Any]:
+        """Return high-level KPI values for the frontend dashboard.
 
-    def move_player(self, dx: int, dy: int) -> Dict[str, Any]:
+        Returns:
+            dict: Quick statistics including budget, visitor count, creature count, and time of day.
+
+        Tests:
+            returns correct creature count from the zoo state
+            returns current day_phase and elapsed_hours values
         """
-        Bewegt die Spielfigur auf dem Grid (WASD-Steuerung).
+        state = self.get_zoo_state()
+        return {
+            "money": state["money"],
+            "visitor_count": state["visitors"],
+            "creature_count": len(state["animals"]),
+            "day_phase": state["time"]["day_phase"],
+            "time_of_day": state["time"]["elapsed_hours"],
+        }
 
-        :param dx: Bewegungsrichtung auf der X-Achse (-1, 0, 1).
-        :param dy: Bewegungsrichtung auf der Y-Achse (-1, 0, 1).
-        :return: Dictionary mit 'success' (bool), 'position' (Tuple[int, int]) und 'message' (str).
+    def _get_age_stage(self, animal: Any, age_days: int) -> int:
+        lifespan = max(1, getattr(animal.lifecycle.seniorPhase, "endOfPhaseAge", 1))
+        capped_age = min(age_days, lifespan - 1)
+        stage = capped_age * 3 // lifespan + 1
+        return min(3, max(1, stage))
+
+    def get_panel_state(self) -> Dict[str, Any]:
+        """Return a state slice optimized for UI panel rendering.
+
+        Returns:
+            dict: Summary of money, visitors, score, animals, staff, enclosures, inventory, and environment.
+
+        Tests:
+            includes the expected dashboard keys
+            derived values match get_zoo_state output
         """
-        new_pos = self.sim.player.move(dx, dy)
-        # Persistiere Spielerposition
-        try:
-            self.db.update_zoo_status(
-                money=self.sim.money,
-                simulation_time=self.sim.simulation_time,
-                is_night=self.sim.is_night,
-                player_x=self.sim.player.x,
-                player_y=self.sim.player.y,
-            )
-        except Exception:
-            pass
+        state = self.get_zoo_state()
+        return {
+            "money": state["money"],
+            "visitors": state["visitors"],
+            "score": state["score"],
+            "elapsed_days": state["time"]["elapsed_days"],
+            "elapsed_hours": state["time"]["elapsed_hours"],
+            "day_phase": state["time"]["day_phase"],
+            "animals": state["animals"],
+            "staff": state["staff"],
+            "enclosures": state["enclosures"],
+            "inventory": state["inventory"],
+            "environment": state["environment"],
+        }
 
-        return {"success": True, "position": new_pos, "message": "Player moved"}
+    def buy_animal(self, species: str) -> Dict[str, Any]:
+        """Purchase a new animal of the requested species if the zoo has sufficient budget.
 
-    def buy_creature(
-        self,
-        species: str,
-        name: Optional[str] = None,
-        position: Optional[Tuple[int, int]] = None,
-    ) -> Dict[str, Any]:
+        Args:
+            species: species name matching the available species map.
+
+        Returns:
+            dict: success flag and descriptive message.
+
+        Tests:
+            valid species with enough budget -> returns success True
+            invalid species -> returns success False
         """
-        Kauft ein neues Tier einer der 6 Arten (Birdy, Liz, Mal, Pinky, Rizzy, Sami).
+        if species not in self.SPECIES_MAP:
+            return {"success": False, "message": "Unknown species."}
+        animal_cls = self.SPECIES_MAP[species]
+        gender = random.choice([Gender.FEMALE, Gender.MALE])
+        name = f"{species}_{random.randint(1000,9999)}"
+        new_animal = animal_cls(name, self.sim.elapsedDays, gender)
+        if self.sim.zoo.budget < new_animal.price:
+            return {"success": False, "message": "Not enough money."}
+        self.sim.zoo.buyNewAnimal(animal_cls, name, self.sim.elapsedDays, gender)
+        return {"success": True, "message": f"Bought {species}."}
 
-        :param species: Tierart ('Birdy', 'Liz', 'Mal', 'Pinky', 'Rizzy', 'Sami').
-        :param name: Optionaler individueller Name für das Tier.
-        :param position: Optionale Grid-Position (x, y) auf der Karte.
-        :return: Dictionary mit 'success' (bool), 'message' (str) und ggf. 'creature' (dict).
+    def buy_food(self, food_type: str, weight: int = 5) -> Dict[str, Any]:
+        """Purchase food of a given type and weight if the zoo has sufficient budget.
+
+        Args:
+            food_type: food type name matching the available food map.
+            weight: amount of food to buy in kilograms.
+
+        Returns:
+            dict: success flag and descriptive message.
+
+        Tests:
+            valid food type with enough budget -> returns success True
+            invalid food type -> returns success False
         """
-        name = name or f"{species}_{str(uuid.uuid4())[:4]}"
-        new_animal = self.sim.buy_animal(species, name)
-        if new_animal:
-            # Persistiert neues Tier
-            try:
-                self.db.add_creature({
-                    "id": new_animal.id,
-                    "species": new_animal.species,
-                    "name": new_animal.name,
-                    "age_seconds": new_animal.age_seconds,
-                    "hunger": new_animal.hunger,
-                    "hunger_timer": new_animal.hunger_timer,
-                    "is_sick": new_animal.is_sick,
-                    "sick_timer": new_animal.sick_timer,
-                    "pos_x": new_animal.x,
-                    "pos_y": new_animal.y,
-                })
-            except Exception:
-                pass
+        if food_type not in self.FOOD_MAP:
+            return {"success": False, "message": "Unknown food type."}
+        food_cls = self.FOOD_MAP[food_type]
+        if self.sim.zoo.budget < food_cls().pricePerKg * weight:
+            return {"success": False, "message": "Not enough money."}
+        self.sim.zoo.buyFood(food_cls, weight, self.sim.elapsedDays)
+        return {"success": True, "message": f"Bought {weight}kg {food_type}."}
 
-            return {"success": True, "message": "Creature bought", "creature": new_animal.to_dict()}
-        return {"success": False, "message": "Not enough money or invalid species"}
+    def buy_medicine(self, medicine_type: str, quantity: int = 1) -> Dict[str, Any]:
+        """Purchase medicine items and add them to the zoo inventory.
 
-    def feed_creature(self, creature_id: str) -> Dict[str, Any]:
+        Args:
+            medicine_type: medicine type name matching the available medicine map.
+            quantity: number of units to buy.
+
+        Returns:
+            dict: success flag and descriptive message.
+
+        Tests:
+            valid medicine type with enough budget -> returns success True
+            invalid medicine type -> returns success False
         """
-        Füttert ein Tier manuell (setzt den Hungerwert zurück bzw. verringert ihn).
+        if medicine_type not in self.MEDICINE_MAP:
+            return {"success": False, "message": "Unknown medicine type."}
+        med_cls = self.MEDICINE_MAP[medicine_type]
+        med_item = med_cls()
+        total_cost = med_item.price * quantity
+        if self.sim.zoo.budget < total_cost:
+            return {"success": False, "message": "Not enough money."}
+        self.sim.zoo.budget -= total_cost
+        self.sim.zoo.inventory.medicine.extend([med_item] * quantity)
+        return {"success": True, "message": f"Bought {quantity}x {medicine_type}."}
 
-        :param creature_id: Eindeutige ID des Tiers.
-        :return: Dictionary mit 'success' (bool) und 'message' (str).
-        """
-        for creature in self.sim.creatures:
-            if creature.id == creature_id:
-                creature.feed()
-                try:
-                    self.db.update_creature({
-                        "id": creature.id,
-                        "age_seconds": creature.age_seconds,
-                        "hunger": creature.hunger,
-                        "hunger_timer": creature.hunger_timer,
-                        "is_sick": creature.is_sick,
-                        "sick_timer": creature.sick_timer,
-                        "pos_x": creature.x,
-                        "pos_y": creature.y,
-                    })
-                except Exception:
-                    pass
-                return {"success": True, "message": "Creature fed"}
-        return {"success": False, "message": "Creature not found"}
+    def sell_animal(self) -> Dict[str, Any]:
+        """Sell one animal from the zoo inventory if available.
 
-    def heal_creature(self, creature_id: str) -> Dict[str, Any]:
-        """
-        Heilt ein erkranktes Tier manuell (stoppt den 15s Krankheitstimer).
+        Returns:
+            dict: success flag and descriptive message.
 
-        :param creature_id: Eindeutige ID des Tiers.
-        :return: Dictionary mit 'success' (bool) und 'message' (str).
+        Tests:
+            animals available -> returns success True and adjusts budget
+            no animals available -> returns success False
         """
-        for creature in self.sim.creatures:
-            if creature.id == creature_id:
-                creature.heal()
-                try:
-                    self.db.update_creature({
-                        "id": creature.id,
-                        "age_seconds": creature.age_seconds,
-                        "hunger": creature.hunger,
-                        "hunger_timer": creature.hunger_timer,
-                        "is_sick": creature.is_sick,
-                        "sick_timer": creature.sick_timer,
-                        "pos_x": creature.x,
-                        "pos_y": creature.y,
-                    })
-                except Exception:
-                    pass
-                return {"success": True, "message": "Creature healed"}
-        return {"success": False, "message": "Creature not found"}
+        if not self.sim.zoo.animals:
+            return {"success": False, "message": "No animals available to sell."}
+        animal = self.sim.zoo.animals.pop()
+        self.sim.zoo.budget += int(animal.price / 2)
+        for enclosure in self.sim.zoo.enclosures:
+            if animal in enclosure.animals:
+                enclosure.animals.remove(animal)
+                break
+        return {"success": True, "message": f"Sold {animal.name}."}
+
+    def fire_staff(self) -> Dict[str, Any]:
+        """Fire one staff member from the zoo if any exist."""
+        if not self.sim.zoo.staff:
+            return {"success": False, "message": "No staff to fire."}
+        fired = self.sim.zoo.staff.pop()
+        return {"success": True, "message": f"Fired {fired.name}."}
+
+    def heal_animal(self) -> Dict[str, Any]:
+        """Heal the first sick animal using any available medicine from inventory."""
+        sick_animals = [animal for animal in self.sim.zoo.animals if animal.illness is not None]
+        if not sick_animals:
+            return {"success": False, "message": "No sick animals found."}
+        if not self.sim.zoo.inventory.medicine:
+            return {"success": False, "message": "No medicine in inventory."}
+        animal = sick_animals[0]
+        medicine = self.sim.zoo.inventory.medicine.pop(0)
+        animal.illness = None
+        animal.health = min(1.0, animal.health + 0.3)
+        return {"success": True, "message": f"Healed {animal.name}."}
 
     def hire_staff(self, staff_type: str) -> Dict[str, Any]:
-        """
-        Stellt neues Personal ein (Kosten: 10$).
+        """Hire a new staff member of the chosen type if budget allows."""
+        if staff_type not in self.STAFF_MAP:
+            return {"success": False, "message": "Unknown staff type."}
+        if self.sim.zoo.budget < 10:
+            return {"success": False, "message": "Not enough money."}
+        staff_cls = self.STAFF_MAP[staff_type]
+        name = f"{staff_type}_{random.randint(1000,9999)}"
+        self.sim.zoo.budget -= 10
+        self.sim.zoo.hireEmployee(staff_cls, name, WorkingHours(8, 18))
+        return {"success": True, "message": f"Hired {staff_type}."}
 
-        Mögliche Rollen:
-        - 'Caretaker': Füttert hungrige Tiere autonom.
-        - 'Vet': Heilt kranke Tiere autonom.
-        - 'Cashier': Bedient den Ticketschalter.
+    def feed_animal(self) -> Dict[str, Any]:
+        """Feed the first hungry animal fully."""
+        hungry = [animal for animal in self.sim.zoo.animals if animal.get_hunger_percent() > 10]
+        if not hungry:
+            return {"success": False, "message": "No hungry animals found."}
+        animal = hungry[0]
+        animal.feed(1.0)
+        return {"success": True, "message": f"Fed {animal.name}."}
 
-        :param staff_type: Rolle des Personals ('Caretaker', 'Vet', 'Cashier').
-        :return: Dictionary mit 'success' (bool), 'message' (str) und 'staff' (dict).
-        """
-        # Generiere einen Default-Namen
-        name = f"{staff_type}_{str(uuid.uuid4())[:4]}"
-        member = self.sim.hire_staff(staff_type, name)
-        if member:
-            try:
-                self.db.add_staff({
-                    "id": member.id,
-                    "staff_type": member.staff_type,
-                    "name": member.name,
-                    "salary": member.salary,
-                    "status": member.status,
-                    "pos_x": member.x,
-                    "pos_y": member.y,
-                })
-            except Exception:
-                pass
-            return {"success": True, "message": "Staff hired", "staff": member.to_dict()}
-        return {"success": False, "message": "Not enough money or invalid staff type"}
+    def clean_enclosure(self) -> Dict[str, Any]:
+        """Clean the first enclosure in the zoo."""
+        if not self.sim.zoo.enclosures:
+            return {"success": False, "message": "No enclosures exist."}
+        enclosure = self.sim.zoo.enclosures[0]
+        enclosure.getCleaned()
+        return {"success": True, "message": f"Cleaned enclosure {enclosure.number}."}
 
-    def fire_staff(self, staff_id: str) -> Dict[str, Any]:
-        """
-        Entlässt ein Personalmitglied.
+    def change_weather(self, weather: str) -> Dict[str, Any]:
+        """Set the environment weather type to the requested value."""
+        current = self.sim.zoo.environment
+        if weather.upper() not in ["SUNNY", "CLOUDY", "RAINY"]:
+            return {"success": False, "message": "Unknown weather type."}
+        current.weather = current.weather.__class__[weather.upper()]
+        return {"success": True, "message": f"Weather set to {weather}."}
 
-        :param staff_id: Eindeutige ID des Mitarbeiters.
-        :return: Dictionary mit 'success' (bool) und 'message' (str).
-        """
-        for member in list(self.sim.staff):
-            if member.id == staff_id:
-                try:
-                    self.sim.staff.remove(member)
-                    self.db.delete_staff(staff_id)
-                except Exception:
-                    pass
-                return {"success": True, "message": "Staff fired"}
-        return {"success": False, "message": "Staff not found"}
+    def move_player(self, dx: int, dy: int) -> Dict[str, Any]:
+        """Move the player avatar by the specified grid offsets."""
+        x, y = self.player_position
+        self.player_position = (max(0, x + dx), max(0, y + dy))
+        return {"success": True, "message": "Player moved."}
 
-    def get_quick_stats(self) -> Dict[str, Any]:
-        """
-        Liefert kompakte Statistiken für die eingeklappte Taskbar am unteren Bildschirmrand.
-
-        :return: Dictionary mit Quick-Stats:
-                 - 'money': int
-                 - 'visitor_count': int
-                 - 'creature_count': int
-                 - 'day_phase': str ('Tag' / 'Nacht')
-                 - 'time_remaining': float (Restzeit der aktuellen Phase in Sekunden)
-        """
-        visitor_count = sum(1 for v in self.sim.visitors if v.status in ["InZoo", "BuyingTicket", "Queuing"])
-        creature_count = len(self.sim.creatures)
-        cycle_progress = self.sim.simulation_time % self.sim.day_duration
-        half = self.sim.day_duration / 2.0
-        if cycle_progress < half:
-            time_remaining = half - cycle_progress
-            day_phase = "Tag"
-        else:
-            time_remaining = self.sim.day_duration - cycle_progress
-            day_phase = "Nacht"
-
-        return {
-            "money": int(self.sim.money),
-            "visitor_count": int(visitor_count),
-            "creature_count": int(creature_count),
-            "day_phase": day_phase,
-            "time_remaining": float(time_remaining),
-        }
-
-    def get_detailed_dashboard(self) -> Dict[str, Any]:
-        """
-        Liefert detaillierte Informationen für das aufgeklappte Dashboard in der Taskbar.
-
-        :return: Dictionary mit umfangreichen Statistiken:
-                 - 'finances': Einnahmen, Ausgaben, Ticketverkäufe, Gehälter (dict)
-                 - 'creatures_summary': Aufschlüsselung nach Arten, Alter, Hunger, Gesundheit (dict)
-                 - 'visitors_summary': Wartezeiten, Gesamteintritte, Zufriedenheit (dict)
-                 - 'staff_summary': Übersicht der aktiven Mitarbeiter (dict)
-        """
-        finances = {
-            "money": int(self.sim.money),
-        }
-
-        creatures_summary: Dict[str, Dict[str, Any]] = {}
-        for c in self.sim.creatures:
-            spec = c.species
-            entry = creatures_summary.setdefault(spec, {"count": 0, "avg_hunger": 0.0, "sick": 0})
-            entry["count"] += 1
-            entry["avg_hunger"] += c.hunger
-            if c.is_sick:
-                entry["sick"] += 1
-
-        # finalize averages
-        for spec, entry in creatures_summary.items():
-            if entry["count"] > 0:
-                entry["avg_hunger"] = entry["avg_hunger"] / entry["count"]
-
-        visitors_summary = {
-            "total": len(self.sim.visitors),
-            "in_queue": sum(1 for v in self.sim.visitors if v.status == "Queuing"),
-            "in_zoo": sum(1 for v in self.sim.visitors if v.status == "InZoo"),
-        }
-
-        staff_summary = {s.id: s.to_dict() for s in self.sim.staff}
-
-        return {
-            "finances": finances,
-            "creatures_summary": creatures_summary,
-            "visitors_summary": visitors_summary,
-            "staff_summary": staff_summary,
-        }
-
-    def get_creatures(self) -> List[Dict[str, Any]]:
-        """
-        Liefert eine Liste aller Tiere im Zoo mit ihren aktuellen Attributen.
-
-        :return: Liste von Dictionaries, jedes repräsentiert ein Tier:
-                 - 'id': str
-                 - 'species': str
-                 - 'name': str
-                 - 'age_seconds': float
-                 - 'life_stage': str ('Kind', 'Erwachsen', 'Alt')
-                 - 'hunger': float (0.0 bis 100.0)
-                 - 'hunger_timer': float (Ablauftimer bei 100% Hunger)
-                 - 'is_sick': bool
-                 - 'sick_timer': float (Ablauftimer bei Krankheit)
-                 - 'position': Tuple[int, int]
-        """
-        return [c.to_dict() for c in self.sim.creatures]
-
-    def get_visitors(self) -> List[Dict[str, Any]]:
-        """
-        Liefert eine Liste aller aktuellen Besucher (Warteschlange & im Zoo).
-
-        :return: Liste von Dictionaries, jedes repräsentiert einen Besucher:
-                 - 'id': str
-                 - 'status': str ('Queuing', 'BuyingTicket', 'InZoo', 'Leaving')
-                 - 'wait_time': float
-                 - 'time_in_zoo': float (max. 40s)
-                 - 'position': Tuple[int, int]
-        """
-        return [v.to_dict() for v in self.sim.visitors]
-
-    def get_staff(self) -> List[Dict[str, Any]]:
-        """
-        Liefert eine Liste aller angestellten Mitarbeiter.
-
-        :return: Liste von Dictionaries, jedes repräsentiert ein Personalmitglied:
-                 - 'id': str
-                 - 'type': str ('Caretaker', 'Vet', 'Cashier')
-                 - 'status': str ('Idle', 'Working')
-                 - 'target_id': Optional[str]
-                 - 'position': Tuple[int, int]
-        """
-        return [s.to_dict() for s in self.sim.staff]
-
-    def get_map_state(self) -> Dict[str, Any]:
-        """
-        Liefert den Zustand der Spielkarte (Grid: 21x16, Karte: 1260x960 Pixel, Sprites: 60x60 Pixel).
-
-        :return: Dictionary mit Map-Informationen:
-                 - 'grid_width': int (21)
-                 - 'grid_height': int (16)
-                 - 'tile_size': int (60)
-                 - 'tiles': List[List[dict]] (Raster-Kacheln mit Typ und Begehbarkeit)
-        """
-        return {
-            "grid_width": 21,
-            "grid_height": 16,
-            "tile_size": 60,
-            "tiles": [[{"type": "floor", "walkable": True} for _ in range(21)] for _ in range(16)],
-        }
-
-    def save_game(self, slot: str = "default") -> Dict[str, Any]:
-        """
-        Speichert den aktuellen Spielstand in der Datenbank.
-
-        :param slot: Bezeichner/Name des Speicherstands.
-        :return: Dictionary mit 'success' (bool) und 'message' (str).
-        """
-        try:
-            # Persistiere Zoo-Status
-            self.db.update_zoo_status(
-                money=self.sim.money,
-                simulation_time=self.sim.simulation_time,
-                is_night=self.sim.is_night,
-                player_x=self.sim.player.x,
-                player_y=self.sim.player.y,
-            )
-
-            # Persistiere alle Tiere
-            for c in self.sim.creatures:
-                try:
-                    self.db.add_creature({
-                        "id": c.id,
-                        "species": c.species,
-                        "name": c.name,
-                        "age_seconds": c.age_seconds,
-                        "hunger": c.hunger,
-                        "hunger_timer": c.hunger_timer,
-                        "is_sick": c.is_sick,
-                        "sick_timer": c.sick_timer,
-                        "pos_x": c.x,
-                        "pos_y": c.y,
-                    })
-                except Exception:
-                    # Falls schon existiert, update
-                    try:
-                        self.db.update_creature({
-                            "id": c.id,
-                            "age_seconds": c.age_seconds,
-                            "hunger": c.hunger,
-                            "hunger_timer": c.hunger_timer,
-                            "is_sick": c.is_sick,
-                            "sick_timer": c.sick_timer,
-                            "pos_x": c.x,
-                            "pos_y": c.y,
-                        })
-                    except Exception:
-                        pass
-
-            # Persistiere Personal
-            for s in self.sim.staff:
-                try:
-                    self.db.add_staff(s.to_dict())
-                except Exception:
-                    pass
-
-            return {"success": True, "message": "Saved to DB (slot override)"}
-        except Exception as e:
-            return {"success": False, "message": f"Save failed: {e}"}
-
-    def load_game(self, slot: str = "default") -> Dict[str, Any]:
-        """
-        Lädt einen gespeicherten Spielstand aus der Datenbank.
-
-        :param slot: Bezeichner/Name des Speicherstands.
-        :return: Dictionary mit 'success' (bool), 'message' (str) und 'state' (dict).
-        """
-        try:
-            zoo_status = self.db.get_zoo_status() or {}
-            self.sim.money = int(zoo_status.get("money", self.sim.money))
-            self.sim.simulation_time = float(zoo_status.get("simulation_time", self.sim.simulation_time))
-            self.sim.is_night = bool(zoo_status.get("is_night", self.sim.is_night))
-            self.sim.player.x = int(zoo_status.get("player_x", self.sim.player.x))
-            self.sim.player.y = int(zoo_status.get("player_y", self.sim.player.y))
-
-            # Lade Tiere
-            creatures = self.db.get_all_creatures()
-            self.sim.creatures = []
-            for c in creatures:
-                a = Animal(
-                    id_=c["id"],
-                    species=c["species"],
-                    name=c["name"],
-                    pos_x=int(c["pos_x"]),
-                    pos_y=int(c["pos_y"]),
-                    age_seconds=float(c.get("age_seconds", 0.0)),
-                    hunger=float(c.get("hunger", 0.0)),
-                    hunger_timer=float(c.get("hunger_timer", 10.0)),
-                    is_sick=bool(c.get("is_sick", False)),
-                    sick_timer=float(c.get("sick_timer", 15.0)),
-                )
-                self.sim.creatures.append(a)
-
-            # Lade Personal
-            staff_rows = self.db.get_all_staff()
-            self.sim.staff = []
-            for s in staff_rows:
-                stype = s.get("staff_type")
-                if stype == "Caretaker":
-                    member = Caretaker(s["id"], s["name"], int(s.get("pos_x", 10)), int(s.get("pos_y", 8)))
-                elif stype == "Vet":
-                    member = Vet(s["id"], s["name"], int(s.get("pos_x", 10)), int(s.get("pos_y", 8)))
-                elif stype == "Cashier":
-                    member = Cashier(s["id"], s["name"], int(s.get("pos_x", 10)), int(s.get("pos_y", 8)))
-                else:
-                    continue
-                member.status = s.get("status", "Idle")
-                self.sim.staff.append(member)
-
-            return {"success": True, "message": "Loaded from DB", "state": self.get_zoo_state()}
-        except Exception as e:
-            return {"success": False, "message": f"Load failed: {e}"}

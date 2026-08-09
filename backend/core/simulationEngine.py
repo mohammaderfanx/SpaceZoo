@@ -7,10 +7,11 @@ version: 1
 
 import random
 import threading
-from core.eventScheduler import EventScheduler
-from core.zoo import Zoo
-from animalSimulation.egg import Egg
-from animalSimulation.animal import Gender
+from backend.core.eventScheduler import EventScheduler
+from backend.core.zoo import Zoo
+from backend.animalSimulation.egg import Egg
+from backend.animalSimulation.animal import Gender
+from backend.animalSimulation.illness import ExampleIllness
 import statistics
 
 class SimulationEngine:
@@ -33,8 +34,24 @@ class SimulationEngine:
             self
 
         Tests:
-            called once -> elapsed time advances and all periodic effects apply, with the next tick scheduled via threading.Timer
+            called once -> elapsed time advances and all periodic effects apply, and the next tick is scheduled
         """
+        self._process_tick()
+        threading.Timer(self.secondsPerTick, self.tick).start()
+
+    def tick_once(self) -> None:
+        """Advances the simulation by one discrete tick without scheduling a timer.
+
+        Args:
+            self
+
+        Tests:
+            called once -> elapsed time advances and all periodic effects apply
+        """
+        self._process_tick()
+
+    def _process_tick(self) -> None:
+        """Processes a single simulation tick."""
         self.increaseTime()
         self.eventScheduler.scheduleEvents(self.elapsedDays, self.elapsedHours)
         self.decreaseSaturation()
@@ -44,8 +61,8 @@ class SimulationEngine:
         self.eggsHatch()
         self.catchIllnesses()
         self.cleanEnclosures()
-        self.calculateVisitorScore()
-        threading.Timer(self.secondsPerTick, self.tick).start()
+        self.zoo.score = self.calculateVisitorScore()
+        self.ticks += 1
 
 
     def increaseTime(self):
@@ -175,6 +192,21 @@ class SimulationEngine:
             enclosure has a sick animal -> higher chance of new illnesses there
             no sick animals present -> lower baseline chance applies
         """
+        for enclosure in self.zoo.enclosures:
+            enclosure_has_sick = any(animal.illness is not None for animal in enclosure.animals)
+            for animal in enclosure.animals:
+                if animal.illness is not None:
+                    continue
+
+                base_risk = 0.02
+                lifecycle_risk = animal.getLifecyclePhase(self.elapsedDays).riskOfIllnessMultiplier * 0.02
+                cleanliness_penalty = (1.0 - enclosure.cleanliness) * 0.05
+                sick_neighbor_bonus = 0.1 if enclosure_has_sick else 0.0
+
+                chance = base_risk + lifecycle_risk + cleanliness_penalty + sick_neighbor_bonus
+                if random.random() < chance:
+                    animal.illness = ExampleIllness()
+                    animal.health = max(0.0, animal.health - 0.1)
 
 
     def decreaseCleanliness(self):

@@ -1,7 +1,7 @@
 """
-DatabaseManager für SpaceZoo.
-Verwaltet die SQLite-Datenbankverbindung, initialisiert das Schema (database/schema.sql)
-und stellt Repository-Methoden (CRUD) für Zoo-Status, Tiere, Personal und Inventar bereit.
+DatabaseManager for SpaceZoo.
+Manages the SQLite database connection, initializes the schema (database/schema.sql),
+and exposes repository-style CRUD methods for zoo status, animals, staff, and inventory.
 """
 
 import os
@@ -12,16 +12,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 class DatabaseManager:
     """
-    Klasse zur Verwaltung der SQLite-Datenbankverbindung und Durchführung
-    von CRUD-Operationen gemäß dem Repository-Pattern.
+    Class to manage the SQLite database connection and perform CRUD operations
+    following the repository pattern.
     """
 
     def __init__(self, db_path: Optional[str] = None) -> None:
         """
-        Initialisiert den DatabaseManager und stellt sicher, dass die Datenbank
-        samt Schema existiert.
+        Initialize the DatabaseManager and ensure the database file and schema exist.
 
-        :param db_path: Optionaler Pfad zur SQLite-Datenbankdatei. Standartmäßig 'database/spacezoo.db'.
+        :param db_path: Optional path to the SQLite database file. Defaults to 'database/spacezoo.db'.
         """
         if db_path is None:
             base_dir = Path(__file__).parent.resolve()
@@ -32,7 +31,7 @@ class DatabaseManager:
 
     def _get_connection(self) -> sqlite3.Connection:
         """
-        Erstellt eine neue SQLite-Verbindung und setzt den row_factory für Dict-ähnlichen Zugriff.
+        Create a new SQLite connection and configure row_factory for dict-like row access.
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -40,11 +39,11 @@ class DatabaseManager:
 
     def _init_db(self) -> None:
         """
-        Initialisiert das Datenbank-Schema aus 'database/schema.sql', falls nicht vorhanden.
+        Initialize the database schema from 'database/schema.sql' if it is missing.
         """
         schema_path = Path(__file__).parent / "schema.sql"
         if not schema_path.exists():
-            raise FileNotFoundError(f"Schema-Datei nicht gefunden: {schema_path}")
+            raise FileNotFoundError(f"Schema file not found: {schema_path}")
 
         with open(schema_path, "r", encoding="utf-8") as f:
             schema_script = f.read()
@@ -58,9 +57,9 @@ class DatabaseManager:
 
     def get_zoo_status(self) -> Optional[Dict[str, Any]]:
         """
-        Liest den aktuellen Singleton-Zoo-Status aus der Datenbank.
+        Read the current singleton zoo status from the database.
 
-        :return: Dictionary mit Geld, Zeit, Tag/Nacht-Status und Spielerposition.
+        :return: Dictionary containing money, simulation time, day/night flag, and player position.
         """
         query = "SELECT money, simulation_time, is_night, player_x, player_y FROM zoo_status WHERE id = 1"
         with self._get_connection() as conn:
@@ -80,7 +79,7 @@ class DatabaseManager:
         player_y: int,
     ) -> None:
         """
-        Aktualisiert den Singleton-Zoo-Status in der Datenbank.
+        Update the singleton zoo status record in the database.
         """
         query = """
             UPDATE zoo_status
@@ -98,9 +97,9 @@ class DatabaseManager:
 
     def add_creature(self, creature: Dict[str, Any]) -> None:
         """
-        Fügt ein neues Tier in die Datenbank ein.
+        Insert a new creature into the database.
 
-        :param creature: Dict mit keys: 'id', 'species', 'name', 'age_seconds', 'hunger', 'hunger_timer', 'is_sick', 'sick_timer', 'pos_x', 'pos_y'
+        :param creature: Dict with keys: 'id', 'species', 'name', 'age_seconds', 'hunger', 'hunger_timer', 'is_sick', 'sick_timer', 'pos_x', 'pos_y'
         """
         query = """
             INSERT INTO creatures (id, species, name, age_seconds, hunger, hunger_timer, is_sick, sick_timer, pos_x, pos_y)
@@ -127,9 +126,9 @@ class DatabaseManager:
 
     def get_all_creatures(self) -> List[Dict[str, Any]]:
         """
-        Liest alle registrierten Tiere aus der Datenbank.
+        Read all registered creatures from the database.
 
-        :return: Liste von Tier-Dictionaries.
+        :return: List of creature dictionaries.
         """
         query = "SELECT * FROM creatures"
         with self._get_connection() as conn:
@@ -145,7 +144,7 @@ class DatabaseManager:
 
     def update_creature(self, creature: Dict[str, Any]) -> None:
         """
-        Aktualisiert den Zustand eines Tieres in der Datenbank.
+        Update the state of a creature record in the database.
         """
         query = """
             UPDATE creatures
@@ -171,7 +170,7 @@ class DatabaseManager:
 
     def delete_creature(self, creature_id: str) -> None:
         """
-        Löscht ein Tier aus der Datenbank (z.B. nach Versterben).
+        Delete a creature from the database (for example, after it has died).
         """
         query = "DELETE FROM creatures WHERE id = ?"
         with self._get_connection() as conn:
@@ -183,9 +182,9 @@ class DatabaseManager:
 
     def add_staff(self, staff_member: Dict[str, Any]) -> None:
         """
-        Fügt ein neues Personalmitglied in die Datenbank ein.
+        Insert a new staff member into the database.
 
-        :param staff_member: Dict mit keys: 'id', 'staff_type', 'name', 'salary', 'status', 'pos_x', 'pos_y'
+        :param staff_member: Dict with keys: 'id', 'staff_type', 'name', 'salary', 'status', 'pos_x', 'pos_y'
         """
         query = """
             INSERT INTO staff (id, staff_type, name, salary, status, pos_x, pos_y)
@@ -209,9 +208,9 @@ class DatabaseManager:
 
     def get_all_staff(self) -> List[Dict[str, Any]]:
         """
-        Liest alle Mitarbeiter aus der Datenbank.
+        Read all staff records from the database.
 
-        :return: Liste von Personal-Dictionaries.
+        :return: List of staff dictionaries.
         """
         query = "SELECT * FROM staff"
         with self._get_connection() as conn:
@@ -221,7 +220,7 @@ class DatabaseManager:
 
     def update_staff(self, staff_member: Dict[str, Any]) -> None:
         """
-        Aktualisiert den Zustand eines Mitarbeiters.
+        Update the state of a staff record.
         """
         query = """
             UPDATE staff
@@ -243,7 +242,7 @@ class DatabaseManager:
 
     def delete_staff(self, staff_id: str) -> None:
         """
-        Entlässt ein Personalmitglied aus der Datenbank.
+        Remove a staff member from the database.
         """
         query = "DELETE FROM staff WHERE id = ?"
         with self._get_connection() as conn:
@@ -255,7 +254,7 @@ class DatabaseManager:
 
     def get_all_inventory(self) -> List[Dict[str, Any]]:
         """
-        Liest das gesamte Inventar aus.
+        Read the full inventory from the database.
         """
         query = "SELECT * FROM inventory"
         with self._get_connection() as conn:
@@ -265,7 +264,7 @@ class DatabaseManager:
 
     def update_inventory_item(self, item_id: str, item_name: str, quantity: int) -> None:
         """
-        Erstellt oder aktualisiert einen Inventar-Eintrag.
+        Create or update an inventory item record.
         """
         query = """
             INSERT INTO inventory (item_id, item_name, quantity, updated_at)
