@@ -71,4 +71,4 @@ Further design notes and a class diagram live under [`docs/`]
 
 ## Contribution Focus
 Backend simulation and animal systems implemented by Jasmin
-Frontend, interface and database support implemented by Mohammed
+Frontend, interface and database support implemented by Mohammad
