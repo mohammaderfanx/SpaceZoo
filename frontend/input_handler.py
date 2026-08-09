@@ -11,6 +11,8 @@ from interface.spacezoo_api import SpaceZooAPI
 
 
 class InputHandler:
+    """Handles keyboard input and dispatches movement commands to the API."""
+
     def __init__(self) -> None:
         # movement cooldown to avoid overly fast repeated moves when holding a key
         self.move_cooldown = 0.08  # seconds between auto-moves when holding

@@ -1,6 +1,7 @@
 """
 Map renderer for SpaceZoo frontend.
-Draws a simple 21x16 grid using Pygame. No backend imports here.
+Draws a simple 21x16 grid using Pygame and loads the background map image.
+The frontend layer does not import backend or database modules.
 """
 
 import pygame
@@ -10,6 +11,8 @@ from frontend.asset_loader import AssetLoader
 
 
 class MapRenderer:
+    """Renders the game map using a fixed grid and optional background image."""
+
     def __init__(self, grid_width: int = 21, grid_height: int = 16, tile_size: int = 60) -> None:
         self.grid_width = grid_width
         self.grid_height = grid_height
@@ -31,15 +34,21 @@ class MapRenderer:
                 pygame.draw.rect(screen, self.line_color, rect, 1)
 
     def draw_background(self, screen: "pygame.Surface") -> None:
-        """Draws the background map using AssetLoader. Falls Laden fehlschlägt, wird das Grid gezeichnet."""
+        """Draws the background map using the AssetLoader.
+
+        If loading fails, falls back to the procedural grid.
+
+        Tests:
+            map asset present -> draws map image onto the screen
+            map asset missing -> draws the grid instead
+        """
         try:
             loader = AssetLoader()
             map_surf = loader.load_map()
-            # Blit the map at (0,0)
             screen.blit(map_surf, (0, 0))
         except Exception:
-            # Fallback to grid
             self.draw_grid(screen)
 
     def screen_size(self) -> Tuple[int, int]:
+        """Return the native rendering surface size based on grid and tile dimensions."""
         return (self.grid_width * self.tile_size, self.grid_height * self.tile_size)

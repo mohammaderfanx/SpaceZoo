@@ -1,7 +1,7 @@
 """
 Frontend entrypoint for SpaceZoo.
-Initialisiert ein Pygame-Fenster (1260x960) und führt die Game-Loop aus.
-Importiert die `SpaceZooAPI` als einzige Schnittstelle zum Backend.
+Initializes a Pygame window (1260x960) and runs the main loop.
+Imports the `SpaceZooAPI` as the only interface to the backend.
 """
 import pygame
 import time
@@ -9,10 +9,10 @@ import os
 import sys
 from typing import Tuple
 
-# Fügt das Projekt-Hauptverzeichnis zum Python-Pfad hinzu
+# Add the project root to the Python path for package imports.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Ab hier folgen deine normalen Imports:
+# Normal imports follow.
 from interface.spacezoo_api import SpaceZooAPI
 from frontend.map_renderer import MapRenderer
 from frontend.input_handler import InputHandler
@@ -21,11 +21,10 @@ from frontend.ui_manager import UIManager
 
 
 def _initial_window_size(native_size: "Tuple[int, int]") -> "Tuple[int, int]":
-    """Bestimmt eine Startfenstergröße, die auf den verfügbaren Bildschirm passt.
+    """Compute a start window size that fits within the available screen area.
 
-    Skaliert `native_size` (1260x960) so weit herunter, dass es innerhalb eines
-    Bereichs des aktuellen Bildschirms (abzüglich Menüleiste/Dock) passt.
-    Wird der Bildschirm nicht ermittelt, bleibt die native Größe erhalten.
+    Scales the native size to fit within a margin of the current display.
+    If the display cannot be queried, returns the native size unchanged.
     """
     native_w, native_h = native_size
     try:
@@ -43,13 +42,14 @@ def _initial_window_size(native_size: "Tuple[int, int]") -> "Tuple[int, int]":
 
 
 def main() -> None:
+    """Initialize Pygame, create the frontend subsystems, and run the main loop."""
     pygame.init()
 
     renderer = MapRenderer()
     native_size = renderer.screen_size()
 
-    # Interne Zeichenfläche in fester nativer Auflösung; wird pro Frame auf die
-    # tatsächliche (frei skalierbare) Fenstergröße herunter-/hochskaliert.
+    # Internal render surface in fixed native resolution; it is scaled each frame to
+    # the current resizable window size.
     game_surface = pygame.Surface(native_size)
 
     screen = pygame.display.set_mode(_initial_window_size(native_size), pygame.RESIZABLE)
@@ -72,7 +72,7 @@ def main() -> None:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             # Let input handler process keydown events
             input_handler.process_event(event, api)
-            ui_manager.process_event(event)
+            ui_manager.process_event(event, api)
 
         now = time.time()
         delta = now - last_time
@@ -100,8 +100,8 @@ def main() -> None:
         except Exception:
             pass
 
-        # Skaliere die native Zeichenfläche auf die aktuelle Fenstergröße
-        # (Seitenverhältnis bleibt erhalten, überschüssiger Platz wird schwarz).
+        # Scale the native render surface to the current window size
+        # (maintaining aspect ratio; excess space is black).
         window_w, window_h = screen.get_size()
         scale = min(window_w / native_size[0], window_h / native_size[1])
         scaled_w = max(1, int(native_size[0] * scale))

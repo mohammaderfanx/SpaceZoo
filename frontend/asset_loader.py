@@ -1,14 +1,10 @@
 """
-AssetLoader (Singleton) für das Frontend.
+AssetLoader (Singleton) for the frontend.
 
-Funktionen:
-- Lädt Bilder mit Pygame
-- Cacht geladene Surfaces im RAM
-- Skaliert die Map auf 1260x960
-- Skaliert Kreaturen/Charaktere auf 60x60
-- Gibt bei Ladefehlern ein farbiges Ersatz-Surface zurück
+This module provides image loading, caching, and scaling for the Pygame frontend.
+It returns placeholder surfaces when asset files are missing or fail to load.
 
-Beachte: Frontend darf laut ARCHITECTURE.md NICHT direkt Backend- oder Database-Module importieren.
+Note: According to ARCHITECTURE.md, frontend code must not import backend or database modules directly.
 """
 
 from __future__ import annotations
@@ -19,6 +15,7 @@ from typing import Dict, Optional, Tuple
 
 
 class AssetLoader:
+    """Singleton asset manager that loads and caches images for the frontend."""
     _instance: Optional["AssetLoader"] = None
 
     def __new__(cls, *args, **kwargs):
@@ -52,10 +49,10 @@ class AssetLoader:
 
     def load_image(self, path: Path, size: Optional[Tuple[int, int]] = None) -> pygame.Surface:
         """
-        Lädt und skaliert ein Bild. Cacht das Ergebnis.
+        Loads and scales an image, caching the result.
 
-        :param path: Pfad zur Bilddatei
-        :param size: Optional gewünschte Größe (width, height)
+        :param path: The path to the image file
+        :param size: Optional desired size (width, height)
         :return: Pygame Surface
         """
         key = f"{path}:{size}"
@@ -76,9 +73,14 @@ class AssetLoader:
             return placeholder
 
     def load_map(self) -> pygame.Surface:
-        """
-        Sucht die Map-Datei unter `assets/map/SpaceZooBase.*` und skaliert sie auf 1260x960.
-        Falls nicht vorhanden, wird ein Ersatz-Surface zurückgegeben.
+        """Loads the zoo map image and scales it to the native screen size.
+
+        Returns:
+            pygame.Surface: The loaded and scaled map surface, or a placeholder if the file is missing.
+
+        Tests:
+            map file exists -> returns an image surface sized 1260x960
+            map file missing -> returns a generated placeholder surface
         """
         map_dir = self.assets_root / "map"
         # try common extensions
@@ -91,9 +93,17 @@ class AssetLoader:
         return self._placeholder_surface(self.map_size, (100, 120, 140))
 
     def load_creature(self, name: str) -> pygame.Surface:
-        """
-        Lädt ein Creature-Sprite aus `assets/creatures/` mit dem gegebenen Namen (ohne Erweiterung)
-        und skaliert es auf 60x60. Bei Fehlern wird ein Platzhalter zurückgegeben.
+        """Loads a creature sprite image by name and scales it to tile size.
+
+        Args:
+            name: Creature asset name without file extension.
+
+        Returns:
+            pygame.Surface: The loaded creature sprite or a placeholder surface.
+
+        Tests:
+            exact file exists -> returns the expected sprite surface
+            no matching file exists -> returns a placeholder surface
         """
         creatures_dir = self.assets_root / "creatures"
         # search for files matching name.*
@@ -111,16 +121,86 @@ class AssetLoader:
         # final fallback: colored square
         return self._placeholder_surface(self.tile_size, (200, 140, 40))
 
+    def _find_creature_folder(self, name: str) -> Optional[Path]:
+        creatures_dir = self.assets_root / "creatures"
+        if not creatures_dir.exists():
+            return None
+        for candidate in creatures_dir.iterdir():
+            if candidate.is_dir() and candidate.name.lower() == name.lower():
+                return candidate
+        return None
+
+    def _try_extract_stage(self, stem: str) -> Optional[int]:
+        import re
+        match = re.search(r"(\d+)$", stem)
+        if match:
+            return int(match.group(1))
+        return None
+
+    def load_creature_stage_images(self, name: str) -> Dict[int, pygame.Surface]:
+        """Loads lifecycle stage images for a creature.
+
+        The method expects files named like 'name 1.png', 'name 2.png', 'name 3.png'
+        inside the creature subfolder.
+
+        Returns:
+            Dict[int, pygame.Surface]: Mapping from stage index 1..3 to surfaces.
+
+        Tests:
+            all three stage files exist -> returns a dict with keys 1, 2, 3
+            missing stage file -> missing stage is filled with closest existing image
+        """
+        folder = self._find_creature_folder(name)
+        if not folder:
+            return {}
+
+        images: Dict[int, pygame.Surface] = {}
+        for path in sorted(folder.iterdir()):
+            if not path.is_file():
+                continue
+            stage = self._try_extract_stage(path.stem)
+            if stage in (1, 2, 3):
+                images[stage] = self.load_image(path, self.tile_size)
+
+        if not images:
+            return {}
+
+        for stage in range(1, 4):
+            if stage not in images:
+                images[stage] = images[max(images.keys())]
+
+        return images
+
+    def load_creature_stage(self, name: str, stage: int) -> pygame.Surface:
+        """Loads the sprite image for a creature at a given lifecycle stage.
+
+        Args:
+            name: creature folder name
+            stage: stage number 1..3 representing early, middle, or late life
+
+        Returns:
+            pygame.Surface: corresponding stage sprite or fallback image
+
+        Tests:
+            valid stage with asset -> returns correct stage surface
+            invalid stage number -> clamps to a valid stage and returns surface
+        """
+        stage = max(1, min(3, stage))
+        images = self.load_creature_stage_images(name)
+        if images:
+            return images.get(stage, images.get(1))
+        return self.load_creature(name)
+
     def load_animation(self, name: str, directions: Tuple[str, str] = ("right", "left")) -> Dict[str, list]:
         """
-        Lädt Animationsframes für ein Entity mit Namensordner oder Namenspräfix.
+        Loads animation frames for an entity from a named folder or file prefix.
 
-        Erwartete Strukturen (in Reihenfolge der Priorität):
-        - assets/creatures/{name}/ (enthält files, z.B. right_1.png, right_2.png, left_1.png...)
-        - assets/creatures/{name}_right_*.png und {name}_left_*.png
-        - assets/creatures/{name}.* (Fallback zu statischem Bild)
+        Expected structures (in descending priority):
+        - assets/creatures/{name}/ (contains files like right_1.png, right_2.png, left_1.png...)
+        - assets/creatures/{name}_right_*.png and {name}_left_*.png
+        - assets/creatures/{name}.* (fallback to a static image)
 
-        Rückgabe: Dict mit Keys für jede Richtung, Wert ist Liste von Surfaces (mindestens 1).
+        Returns: Dict with one key per direction, each value is a list of Surfaces.
         """
         result: Dict[str, list] = {d: [] for d in directions}
         creatures_dir = self.assets_root / "creatures"
@@ -172,7 +252,8 @@ class AssetLoader:
 
     def load_all_creatures(self) -> Dict[str, pygame.Surface]:
         """
-        Lädt und cached alle Bilder unter `assets/creatures/` und skaliert sie.
+        Loads and caches all images under `assets/creatures/` and scales them.
+
         :return: Dict mapping basename (without extension) to Surface
         """
         result: Dict[str, pygame.Surface] = {}

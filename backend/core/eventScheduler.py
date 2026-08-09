@@ -4,11 +4,15 @@ date: 08.08.2026
 version: 1
 """
 
-from core.zoo import Zoo
-from zooManagement.employee import Caretaker, WorkingHours, Employee
-from animalSimulation.animal import Animal
-from zooManagement.food import FoodItem
+import random
 from typing import List
+
+from backend.animalSimulation.animal import Animal
+from backend.animalSimulation.habits import FoodPreference
+from backend.animalSimulation.illness import ExampleIllness
+from backend.core.zoo import Zoo
+from backend.zooManagement.employee import Caretaker, WorkingHours, Employee
+from backend.zooManagement.food import FoodItem, Meat, Hay, Fish
 
 class EventScheduler:
     """Triggers time-based zoo events such as feeding, aging, and visitor arrivals/departures."""
@@ -20,7 +24,6 @@ class EventScheduler:
         """Dispatches time-based events for the current hour.
 
         Args:
-            self
             elapsedDays: number of full days elapsed in the simulation
             elapsedHours: current hour of the simulation day
 
@@ -36,74 +39,60 @@ class EventScheduler:
             self.visitorsArrive()
         if elapsedHours == 17:
             self.visitorsLeave()
-        self.feedAnimals(elapsedHours)
+        self.feedAnimals(elapsedHours, elapsedDays)
         self.animalsSleep(elapsedHours)
 
 
 
-    def feedAnimals(self, elapsedHours: int):
-        """Feeds all animals due for feeding using available caretakers.
-
-        Args:
-            self
-            elapsedHours: current hour of the simulation day
-
-        Tests:
-            animals due for feeding and caretakers available -> caretakers feed them
-            no animals due for feeding -> method returns without feeding
-            animals due for feeding but no caretakers available -> method returns without feeding
-        """
+    def feedAnimals(self, elapsedHours: int, elapsedDays: int):
+        """Feeds all animals due for feeding using available caretakers."""
 
         animalsToFeed: List[Animal] = []
         for animal in self.zoo.animals:
-            if animal.habits.eatingHabit.feedingTimes.__contains__(elapsedHours):
+            if elapsedHours in animal.habits.eatingHabit.feedingTimes:
                 animalsToFeed.append(animal)
 
         if len(animalsToFeed) == 0:
-            return # no animal needs feeding
-        
+            return
+
         availableCaretakers = self.zoo.getCaretakers()
-
         if len(availableCaretakers) == 0:
-            return # no caretaker to feed animals
+            return
 
-        for indexAnimal in range(len(animalsToFeed)):
-            currentAnimal = animalsToFeed[indexAnimal]
-            # check if enough food
+        for indexAnimal, currentAnimal in enumerate(animalsToFeed):
             currentCaretaker = availableCaretakers[indexAnimal % len(availableCaretakers)]
-            currentCaretaker.feedAnimal(currentAnimal, self.__determineHungerQuelled(currentAnimal))
+            percent = self.__determineHungerQuelled(currentAnimal, elapsedDays)
+            currentCaretaker.feedAnimal(currentAnimal, percent)
          
         
-    def __determineHungerQuelled(self, currentAnimal: Animal):
-            """Calculates the percentage of the animal's hunger satisfied by available food.
+    def __determineHungerQuelled(self, currentAnimal: Animal, elapsedDays: int) -> float:
+        """Calculates the fraction of required feeding that available food can cover."""
+        preference = currentAnimal.habits.eatingHabit.foodPreference
+        if preference == FoodPreference.CARNIVORE:
+            food_categories = [Meat]
+        elif preference == FoodPreference.HERBIVORE:
+            food_categories = [Hay]
+        else:
+            food_categories = [Meat, Hay, Fish]
 
-            Args:
-                self
-                currentAnimal: the animal being fed
+        requiredFood = currentAnimal.getLifecyclePhase(elapsedDays).requiredFoodPerFeeding
+        additionalFoodNeeded = requiredFood
+        possibleFoodForAnimal: List[FoodItem] = []
+        for food_cls in food_categories:
+            possibleFoodForAnimal.extend(self.zoo.inventory.listOfFoodInCategory(food_cls))
 
-            Returns:
-                float: fraction of the required food that could be supplied, capped at 1
+        for currentFoodItem in list(possibleFoodForAnimal):
+            if additionalFoodNeeded <= 0:
+                break
+            amount = min(additionalFoodNeeded, currentFoodItem.weight)
+            currentFoodItem.weight -= amount
+            additionalFoodNeeded -= amount
+            if currentFoodItem.weight <= 0 and currentFoodItem in self.zoo.inventory.food:
+                self.zoo.inventory.food.remove(currentFoodItem)
 
-            Tests:
-                enough matching food in inventory -> returns 1
-                no matching food in inventory -> returns 0
-                partial matching food in inventory -> returns a value between 0 and 1
-            """
-            foodPreference = currentAnimal.habits.eatingHabit.foodPreference.name
-            requiredFood = currentAnimal.getLifecyclePhase().requiredFoodPerFeeding
-            additionalFoodNeeded = requiredFood
-            possibleFoodForAnimal = self.zoo.inventory.listOfFoodInCategory(type[foodPreference])
-            assignedFood = 0
-            while additionalFoodNeeded > assignedFood and len(possibleFoodForAnimal) != 0:
-                currentFoodItem = possibleFoodForAnimal.pop(0)
-                currentFoodItem.weight -= additionalFoodNeeded
-                additionalFoodNeeded = -currentFoodItem.weight
-                if currentFoodItem.weight <= 0:
-                    self.zoo.inventory.food.remove(currentFoodItem)
-            if additionalFoodNeeded < 0:
-                additionalFoodNeeded = 0
-            percentHungerQuelled = (requiredFood - additionalFoodNeeded) / requiredFood # is 1 if enough food
-            return percentHungerQuelled
+        if requiredFood <= 0:
+            return 1.0
+        return max(0.0, min(1.0, (requiredFood - additionalFoodNeeded) / requiredFood))
 
 
     def animalsSleep(self, elapsedHours: int):
@@ -127,7 +116,7 @@ class EventScheduler:
             animal.sleep()
 
         animalsToPutWake = [animal for animal in self.zoo.animals if animal.habits.sleepingHabit.hourOfWaking == elapsedHours]
-        for animal in animalsToPutToSleep:
+        for animal in animalsToPutWake:
             animal.wake()
                 
 
@@ -145,8 +134,8 @@ class EventScheduler:
         """
         for animal in self.zoo.animals:
             age = elapsedDays - animal.birthdate
-            if age == animal.getLifecyclePhase().endOfPhaseAge:
-                animal.age()
+            if age == animal.getLifecyclePhase(elapsedDays).endOfPhaseAge:
+                animal.age(elapsedDays)
 
 
     def visitorsArrive(self):
@@ -163,7 +152,7 @@ class EventScheduler:
         if len(availableCashiers) == 0:
             return
         ticketPrice = 5
-        newVisitors = self.zoo.score
+        newVisitors = int(self.zoo.score)
         for index in range(newVisitors):
             cashier = availableCashiers[index % len(availableCashiers)]
             cashier.sellTicket()

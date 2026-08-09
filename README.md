@@ -50,4 +50,8 @@ Weiterführende Aktionen
 ----------------------
 - `python -m pytest` (falls Tests ergänzt wurden)
 - Vor dem Commit: `pip freeze > requirements.txt` um exakte Versionen zu pinnen (optional)
-yay
+- Headless render in Codespaces:
+  ```bash
+  python frontend/headless_screenshot.py
+  ```
+  This generates `codespaces_screenshot.png` in the project root.

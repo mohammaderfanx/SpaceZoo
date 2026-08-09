@@ -1,10 +1,10 @@
 """
-Entwickler-Watcher für SpaceZoo.
+Developer watcher for SpaceZoo.
 
-Beobachtet Quellcode- (.py) und Asset-Dateien im Projekt und startet
-`frontend/main.py` automatisch neu, sobald sich eine davon ändert.
+Monitors source (.py) and asset files and restarts `frontend/main.py`
+when changes are detected.
 
-Nutzung:
+Usage:
     python watch_and_run.py
 """
 
@@ -24,7 +24,7 @@ POLL_INTERVAL_SECONDS = 0.5
 
 
 def _snapshot() -> dict:
-    """Erfasst Pfad -> Änderungszeitpunkt für alle beobachteten Dateien."""
+    """Capture path -> modification time for all watched files."""
     state = {}
 
     for dir_name in WATCH_SOURCE_DIRS:
@@ -63,15 +63,16 @@ def _stop(process: subprocess.Popen) -> None:
 
 
 def main() -> None:
+    """Start the file watcher and restart the frontend on code or asset changes."""
     process = _launch()
     last_state = _snapshot()
-    print("Watcher aktiv – beobachte .py- und Asset-Änderungen (Ctrl+C zum Beenden).")
+    print("Watcher active – monitoring .py and asset files (Ctrl+C to stop).")
 
     try:
         while True:
             time.sleep(POLL_INTERVAL_SECONDS)
 
-            # Neu starten, falls das Spiel manuell geschlossen wurde.
+            # Restart if the game process has stopped unexpectedly.
             if process.poll() is not None:
                 current_state = _snapshot()
                 last_state = current_state
@@ -80,12 +81,12 @@ def main() -> None:
 
             current_state = _snapshot()
             if current_state != last_state:
-                print("Änderung erkannt – starte SpaceZoo neu ...")
+                print("Change detected - restarting SpaceZoo...")
                 last_state = current_state
                 _stop(process)
                 process = _launch()
     except KeyboardInterrupt:
-        print("Watcher wird beendet ...")
+        print("Watcher is stopping...")
     finally:
         _stop(process)
 

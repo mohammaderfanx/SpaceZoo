@@ -4,8 +4,8 @@ date: 08.08.2026
 version: 1
 """
 
-from animalSimulation.habits import FoodPreference
-from animalSimulation.animal import Animal
+from backend.animalSimulation.habits import FoodPreference
+from backend.animalSimulation.animal import Animal
 from itertools import count
 from typing import List
 
